@@ -62,9 +62,9 @@ class WorkoutProvider extends ChangeNotifier {
     return await _service.checkSensors();
   }
 
-  Future<void> startWorkout(Preset preset) async {
+  Future<void> startWorkout(Preset preset, {bool speakUnits = true}) async {
     _activePreset = preset;
-    await _service.startWorkout(preset);
+    await _service.startWorkout(preset, speakUnits: speakUnits);
   }
 
   void pauseWorkout() {

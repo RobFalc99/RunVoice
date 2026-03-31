@@ -44,20 +44,35 @@ class PresetProvider extends ChangeNotifier {
         AlertConfig(
           id: _uuid.v4(),
           name: 'Battito Cardiaco',
-          type: AlertType.heartRateZone,
+          metric: AlertMetric.bpm,
+          mode: AlertMode.current,
           intervalSeconds: 120,
         ),
         AlertConfig(
           id: _uuid.v4(),
           name: 'Distanza',
-          type: AlertType.distance,
+          metric: AlertMetric.distance,
+          mode: AlertMode.total,
           intervalSeconds: 300,
         ),
         AlertConfig(
           id: _uuid.v4(),
           name: 'Passo',
-          type: AlertType.pace,
+          metric: AlertMetric.pace,
+          mode: AlertMode.current,
           intervalSeconds: 180,
+        ),
+      ],
+      coachingAlerts: [
+        CoachingAlert(
+          id: _uuid.v4(),
+          name: 'Zona 2 (Fondo)',
+          metric: AlertMetric.hrZone,
+          minValue: 2,
+          maxValue: 2.9,
+          okIntervalSeconds: 300,
+          outOfRangeDelaySeconds: 15,
+          enabled: false,
         ),
       ],
     );
@@ -153,6 +168,53 @@ class PresetProvider extends ChangeNotifier {
       );
       if (alertIndex != -1) {
         _presets[index].alerts[alertIndex] = alert;
+        _presets[index].updatedAt = DateTime.now();
+        await _save();
+        notifyListeners();
+      }
+    }
+  }
+
+  /// Add a coaching alert to a preset
+  Future<void> addCoachingAlertToPreset(
+    String presetId,
+    CoachingAlert alert,
+  ) async {
+    final index = _presets.indexWhere((p) => p.id == presetId);
+    if (index != -1) {
+      _presets[index].coachingAlerts.add(alert);
+      _presets[index].updatedAt = DateTime.now();
+      await _save();
+      notifyListeners();
+    }
+  }
+
+  /// Remove a coaching alert from a preset
+  Future<void> removeCoachingAlertFromPreset(
+    String presetId,
+    String alertId,
+  ) async {
+    final index = _presets.indexWhere((p) => p.id == presetId);
+    if (index != -1) {
+      _presets[index].coachingAlerts.removeWhere((a) => a.id == alertId);
+      _presets[index].updatedAt = DateTime.now();
+      await _save();
+      notifyListeners();
+    }
+  }
+
+  /// Update a coaching alert within a preset
+  Future<void> updateCoachingAlertInPreset(
+    String presetId,
+    CoachingAlert alert,
+  ) async {
+    final index = _presets.indexWhere((p) => p.id == presetId);
+    if (index != -1) {
+      final alertIndex = _presets[index].coachingAlerts.indexWhere(
+        (a) => a.id == alert.id,
+      );
+      if (alertIndex != -1) {
+        _presets[index].coachingAlerts[alertIndex] = alert;
         _presets[index].updatedAt = DateTime.now();
         await _save();
         notifyListeners();

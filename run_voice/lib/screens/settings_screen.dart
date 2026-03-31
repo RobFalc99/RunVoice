@@ -107,7 +107,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(height: 28),
                     _sectionTitle('VOCE'),
                     const SizedBox(height: 12),
-                    _buildVoiceSection(ttsProvider),
+                    _buildVoiceSection(ttsProvider, userProvider),
 
                     const SizedBox(height: 80),
                   ],
@@ -365,7 +365,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildVoiceSection(TtsProvider ttsProvider) {
+  Widget _buildVoiceSection(
+    TtsProvider ttsProvider,
+    UserProvider userProvider,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -376,6 +379,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Voice Selection
           if (ttsProvider.availableVoices.isNotEmpty) ...[
             const Text(
               'Seleziona voce',
@@ -438,6 +442,64 @@ class _SettingsScreenState extends State<SettingsScreen> {
               'Caricamento voci...',
               style: TextStyle(color: AppColors.textMuted),
             ),
+
+          const SizedBox(height: 16),
+          const Divider(color: AppColors.surfaceHighlight),
+          const SizedBox(height: 16),
+
+          // Speech Speed
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Velocità di riproduzione',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Text(
+                '${userProvider.profile.speechRate}x',
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          Slider(
+            value: userProvider.profile.speechRate,
+            min: 1.0,
+            max: 2.0,
+            divisions: 4,
+            label: '${userProvider.profile.speechRate}x',
+            onChanged: (val) {
+              userProvider.updateSpeechRate(val);
+              ttsProvider.setSpeechRate(val);
+            },
+          ),
+
+          const SizedBox(height: 8),
+
+          // Speak units
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text(
+              'Pronuncia unità di misura (km, bpm...)',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            activeColor: AppColors.primary,
+            value: userProvider.profile.speakUnits,
+            onChanged: (val) {
+              userProvider.updateSpeakUnits(val);
+            },
+          ),
+
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
@@ -445,6 +507,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               icon: const Icon(Icons.volume_up, size: 18),
               label: const Text('Testa voce'),
               onPressed: () {
+                ttsProvider.setSpeechRate(userProvider.profile.speechRate);
                 ttsProvider.testVoice(
                   'Ciao! Sono la tua assistente vocale per la corsa.',
                 );

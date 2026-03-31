@@ -25,6 +25,12 @@ class TtsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> setSpeechRate(double rate) async {
+    // Normal flutter tts uses 0.0 to 1.0. App uses 1.0 to 2.0.
+    // Map 1.0->0.5, 2.0->1.0
+    await _service.setSpeechRate(rate * 0.5);
+  }
+
   Future<void> testVoice(String message) async {
     await _service.speakNow(message);
   }

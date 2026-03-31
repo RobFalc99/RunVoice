@@ -21,6 +21,8 @@ class WorkoutService {
   Duration _pausedDuration = Duration.zero;
   Timer? _workoutTimer;
   final Map<String, Timer> _alertTimers = {};
+  final Map<String, int> _coachingOutDuration = {};
+  final Map<String, int> _coachingOkDuration = {};
   List<HeartRateZone> _hrZones = [];
 
   // Current workout data
@@ -64,9 +66,13 @@ class WorkoutService {
     return {'gps': gpsAvailable, 'heartRate': btConnected};
   }
 
+  bool _speakUnits = true;
+
   /// Start workout with given preset
-  Future<void> startWorkout(Preset preset) async {
+  Future<void> startWorkout(Preset preset, {bool speakUnits = true}) async {
+    _speakUnits = speakUnits;
     _activePreset = preset;
+
     _startTime = DateTime.now();
     _pausedDuration = Duration.zero;
     _currentHeartRate = 0;
@@ -74,6 +80,8 @@ class WorkoutService {
     _distanceKm = 0;
     _paceMinPerKm = 0;
     _elapsedTime = Duration.zero;
+    _coachingOutDuration.clear();
+    _coachingOkDuration.clear();
 
     // Setup Bluetooth HR callbacks
     _bluetoothService.onHeartRateUpdate = (hr) {
@@ -102,6 +110,7 @@ class WorkoutService {
     _workoutTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (_state == WorkoutState.running) {
         _elapsedTime = DateTime.now().difference(_startTime!) - _pausedDuration;
+        _evaluateCoachingAlerts();
         onDataUpdated?.call();
       }
     });
@@ -114,6 +123,52 @@ class WorkoutService {
 
     // Announce workout start
     _ttsService.enqueue('Allenamento iniziato. Buona corsa!');
+  }
+
+  void _evaluateCoachingAlerts() {
+    if (_activePreset == null) return;
+    for (var alert in _activePreset!.coachingAlerts) {
+      if (!alert.enabled) continue;
+
+      final value = alert.getCurrentValue(
+        heartRate: _currentHeartRate > 0 ? _currentHeartRate : null,
+        heartRateZone: _currentZone,
+        speedKmh: _paceMinPerKm > 0 ? (60 / _paceMinPerKm) : null,
+        paceMinPerKm: _paceMinPerKm > 0 ? _paceMinPerKm : null,
+      );
+
+      if (value == null) {
+        _coachingOutDuration[alert.id] = 0;
+        _coachingOkDuration[alert.id] = 0;
+        continue;
+      }
+
+      if (value >= alert.minValue && value <= alert.maxValue) {
+        // In range
+        _coachingOutDuration[alert.id] = 0;
+        _coachingOkDuration[alert.id] =
+            (_coachingOkDuration[alert.id] ?? 0) + 1;
+
+        if (_coachingOkDuration[alert.id]! >= alert.okIntervalSeconds) {
+          _ttsService.enqueue(
+            alert.buildMessage(value, speakUnits: _speakUnits),
+          );
+          _coachingOkDuration[alert.id] = 0;
+        }
+      } else {
+        // Out of range
+        _coachingOkDuration[alert.id] = 0;
+        _coachingOutDuration[alert.id] =
+            (_coachingOutDuration[alert.id] ?? 0) + 1;
+
+        if (_coachingOutDuration[alert.id]! >= alert.outOfRangeDelaySeconds) {
+          _ttsService.enqueue(
+            alert.buildMessage(value, speakUnits: _speakUnits),
+          );
+          _coachingOutDuration[alert.id] = 0;
+        }
+      }
+    }
   }
 
   /// Setup periodic alert timers
@@ -140,6 +195,7 @@ class WorkoutService {
       distanceKm: _distanceKm,
       paceMinPerKm: _paceMinPerKm > 0 ? _paceMinPerKm : null,
       elapsedTime: _elapsedTime,
+      speakUnits: _speakUnits,
     );
     _ttsService.enqueue(message);
   }

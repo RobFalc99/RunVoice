@@ -1,63 +1,101 @@
-import 'dart:convert';
+/// Type of metric being tracked
+enum AlertMetric { distance, time, speed, pace, bpm, hrZone }
 
-enum AlertType { heartRateZone, distance, pace, time }
-
-extension AlertTypeExtension on AlertType {
+extension AlertMetricExtension on AlertMetric {
   String get displayName {
     switch (this) {
-      case AlertType.heartRateZone:
-        return 'Heart Rate Zone';
-      case AlertType.distance:
-        return 'Distance';
-      case AlertType.pace:
-        return 'Pace';
-      case AlertType.time:
-        return 'Time';
+      case AlertMetric.distance:
+        return 'Distanza';
+      case AlertMetric.time:
+        return 'Tempo';
+      case AlertMetric.speed:
+        return 'Velocità';
+      case AlertMetric.pace:
+        return 'Ritmo';
+      case AlertMetric.bpm:
+        return 'BPM';
+      case AlertMetric.hrZone:
+        return 'Zona FC';
     }
   }
 
-  String get icon {
+  String get iconName {
     switch (this) {
-      case AlertType.heartRateZone:
-        return 'favorite';
-      case AlertType.distance:
+      case AlertMetric.distance:
         return 'straighten';
-      case AlertType.pace:
-        return 'speed';
-      case AlertType.time:
+      case AlertMetric.time:
         return 'timer';
+      case AlertMetric.speed:
+        return 'speed';
+      case AlertMetric.pace:
+        return 'directions_run';
+      case AlertMetric.bpm:
+        return 'favorite';
+      case AlertMetric.hrZone:
+        return 'area_chart';
     }
   }
 
-  String get description {
+  /// The unit spoken/displayed for this metric
+  String get unit {
     switch (this) {
-      case AlertType.heartRateZone:
-        return 'Announce current heart rate and zone';
-      case AlertType.distance:
-        return 'Announce total distance covered';
-      case AlertType.pace:
-        return 'Announce current pace (min/km)';
-      case AlertType.time:
-        return 'Announce elapsed time';
+      case AlertMetric.distance:
+        return 'km';
+      case AlertMetric.time:
+        return '';
+      case AlertMetric.speed:
+        return 'km/h';
+      case AlertMetric.pace:
+        return 'min/km';
+      case AlertMetric.bpm:
+        return 'BPM';
+      case AlertMetric.hrZone:
+        return '';
     }
   }
 }
 
+/// The aggregation mode for the alert
+enum AlertMode {
+  total, // Complessivo
+  interval, // Intervallo
+  lap, // Giro
+  current, // Attuale
+}
+
+extension AlertModeExtension on AlertMode {
+  String get displayName {
+    switch (this) {
+      case AlertMode.total:
+        return 'Complessivo';
+      case AlertMode.interval:
+        return 'Intervallo';
+      case AlertMode.lap:
+        return 'Giro';
+      case AlertMode.current:
+        return 'Attuale';
+    }
+  }
+}
+
+/// A standard periodic alert that announces a metric value
 class AlertConfig {
   final String id;
-  String name;
-  AlertType type;
-  int intervalSeconds; // How often the alert fires
+  String name; // The text spoken by TTS
+  AlertMetric metric;
+  AlertMode mode;
+  int intervalSeconds;
+  double lapDistanceKm; // Only used when mode == lap
   bool enabled;
-  String? customMessage; // Custom TTS message template
 
   AlertConfig({
     required this.id,
     required this.name,
-    required this.type,
+    required this.metric,
+    this.mode = AlertMode.current,
     this.intervalSeconds = 60,
+    this.lapDistanceKm = 1.0,
     this.enabled = true,
-    this.customMessage,
   });
 
   /// Build the TTS message based on current workout data
@@ -66,70 +104,282 @@ class AlertConfig {
     int? heartRateZone,
     double? distanceKm,
     double? paceMinPerKm,
+    double? speedKmh,
     Duration? elapsedTime,
+    // Lap data
+    double? lapDistanceCurrent,
+    double? lapPace,
+    double? lapSpeed,
+    Duration? lapTime,
+    // Interval data
+    double? intervalDistance,
+    double? intervalPace,
+    double? intervalSpeed,
+    Duration? intervalTime,
+    bool speakUnits = true,
   }) {
-    switch (type) {
-      case AlertType.heartRateZone:
-        if (heartRate == null) return 'Heart rate sensor not available';
-        final zoneText = heartRateZone != null ? ', zone $heartRateZone' : '';
-        return 'Heart rate: $heartRate BPM$zoneText';
-      case AlertType.distance:
-        if (distanceKm == null) return 'Distance not available';
-        return 'Distance: ${distanceKm.toStringAsFixed(2)} kilometers';
-      case AlertType.pace:
-        if (paceMinPerKm == null ||
-            paceMinPerKm.isInfinite ||
-            paceMinPerKm.isNaN) {
-          return 'Pace not available';
-        }
-        final minutes = paceMinPerKm.floor();
-        final seconds = ((paceMinPerKm - minutes) * 60).round();
-        return 'Pace: $minutes minutes ${seconds.toString().padLeft(2, '0')} seconds per kilometer';
-      case AlertType.time:
-        if (elapsedTime == null) return 'Time not available';
-        final hours = elapsedTime.inHours;
-        final mins = elapsedTime.inMinutes.remainder(60);
-        final secs = elapsedTime.inSeconds.remainder(60);
-        if (hours > 0) {
-          return 'Time: $hours hours $mins minutes $secs seconds';
-        }
-        return 'Time: $mins minutes $secs seconds';
+    final value = _getValue(
+      heartRate: heartRate,
+      heartRateZone: heartRateZone,
+      distanceKm: distanceKm,
+      paceMinPerKm: paceMinPerKm,
+      speedKmh: speedKmh,
+      elapsedTime: elapsedTime,
+      lapDistanceCurrent: lapDistanceCurrent,
+      lapPace: lapPace,
+      lapSpeed: lapSpeed,
+      lapTime: lapTime,
+      intervalDistance: intervalDistance,
+      intervalPace: intervalPace,
+      intervalSpeed: intervalSpeed,
+      intervalTime: intervalTime,
+    );
+
+    if (value == null) return '$name: non disponibile';
+
+    final unitText = speakUnits ? ' ${metric.unit}' : '';
+    return '$name: $value$unitText';
+  }
+
+  String? _getValue({
+    int? heartRate,
+    int? heartRateZone,
+    double? distanceKm,
+    double? paceMinPerKm,
+    double? speedKmh,
+    Duration? elapsedTime,
+    double? lapDistanceCurrent,
+    double? lapPace,
+    double? lapSpeed,
+    Duration? lapTime,
+    double? intervalDistance,
+    double? intervalPace,
+    double? intervalSpeed,
+    Duration? intervalTime,
+  }) {
+    switch (metric) {
+      case AlertMetric.bpm:
+        if (heartRate == null || heartRate == 0) return null;
+        return '$heartRate';
+      case AlertMetric.hrZone:
+        if (heartRateZone == null) return null;
+        return 'zona $heartRateZone';
+      case AlertMetric.distance:
+        final dist = _pickByMode(
+          distanceKm,
+          intervalDistance,
+          lapDistanceCurrent,
+          distanceKm,
+        );
+        if (dist == null) return null;
+        return dist.toStringAsFixed(2);
+      case AlertMetric.time:
+        final time = _pickDurationByMode(
+          elapsedTime,
+          intervalTime,
+          lapTime,
+          elapsedTime,
+        );
+        if (time == null) return null;
+        return _formatDuration(time);
+      case AlertMetric.speed:
+        final spd = _pickByMode(speedKmh, intervalSpeed, lapSpeed, speedKmh);
+        if (spd == null || spd <= 0) return null;
+        return spd.toStringAsFixed(1);
+      case AlertMetric.pace:
+        final p = _pickByMode(
+          paceMinPerKm,
+          intervalPace,
+          lapPace,
+          paceMinPerKm,
+        );
+        if (p == null || p <= 0 || p.isInfinite || p.isNaN) return null;
+        final minutes = p.floor();
+        final seconds = ((p - minutes) * 60).round();
+        return '$minutes:${seconds.toString().padLeft(2, '0')}';
     }
+  }
+
+  double? _pickByMode(
+    double? total,
+    double? interval,
+    double? lap,
+    double? current,
+  ) {
+    switch (mode) {
+      case AlertMode.total:
+        return total;
+      case AlertMode.interval:
+        return interval;
+      case AlertMode.lap:
+        return lap;
+      case AlertMode.current:
+        return current;
+    }
+  }
+
+  Duration? _pickDurationByMode(
+    Duration? total,
+    Duration? interval,
+    Duration? lap,
+    Duration? current,
+  ) {
+    switch (mode) {
+      case AlertMode.total:
+        return total;
+      case AlertMode.interval:
+        return interval;
+      case AlertMode.lap:
+        return lap;
+      case AlertMode.current:
+        return current;
+    }
+  }
+
+  String _formatDuration(Duration d) {
+    final h = d.inHours;
+    final m = d.inMinutes.remainder(60);
+    final s = d.inSeconds.remainder(60);
+    if (h > 0) return '$h ore $m minuti $s secondi';
+    return '$m minuti $s secondi';
   }
 
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
-    'type': type.index,
+    'metric': metric.index,
+    'mode': mode.index,
     'intervalSeconds': intervalSeconds,
+    'lapDistanceKm': lapDistanceKm,
     'enabled': enabled,
-    'customMessage': customMessage,
   };
 
   factory AlertConfig.fromJson(Map<String, dynamic> json) => AlertConfig(
     id: json['id'] as String,
     name: json['name'] as String,
-    type: AlertType.values[json['type'] as int],
+    metric: AlertMetric.values[json['metric'] as int? ?? 0],
+    mode: AlertMode.values[json['mode'] as int? ?? 0],
     intervalSeconds: json['intervalSeconds'] as int? ?? 60,
+    lapDistanceKm: (json['lapDistanceKm'] as num?)?.toDouble() ?? 1.0,
     enabled: json['enabled'] as bool? ?? true,
-    customMessage: json['customMessage'] as String?,
   );
-
-  String toJsonString() => jsonEncode(toJson());
 
   AlertConfig copyWith({
     String? id,
     String? name,
-    AlertType? type,
+    AlertMetric? metric,
+    AlertMode? mode,
     int? intervalSeconds,
+    double? lapDistanceKm,
     bool? enabled,
-    String? customMessage,
   }) => AlertConfig(
     id: id ?? this.id,
     name: name ?? this.name,
-    type: type ?? this.type,
+    metric: metric ?? this.metric,
+    mode: mode ?? this.mode,
     intervalSeconds: intervalSeconds ?? this.intervalSeconds,
+    lapDistanceKm: lapDistanceKm ?? this.lapDistanceKm,
     enabled: enabled ?? this.enabled,
-    customMessage: customMessage ?? this.customMessage,
   );
+}
+
+/// A coaching alert that monitors a metric against a range
+class CoachingAlert {
+  final String id;
+  String name;
+  AlertMetric metric; // speed, pace, bpm, hrZone
+  double minValue;
+  double maxValue;
+  int okIntervalSeconds; // How often to say "all good"
+  int outOfRangeDelaySeconds; // How long out of range before alerting
+  bool enabled;
+
+  CoachingAlert({
+    required this.id,
+    required this.name,
+    required this.metric,
+    required this.minValue,
+    required this.maxValue,
+    this.okIntervalSeconds = 120,
+    this.outOfRangeDelaySeconds = 10,
+    this.enabled = true,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'metric': metric.index,
+    'minValue': minValue,
+    'maxValue': maxValue,
+    'okIntervalSeconds': okIntervalSeconds,
+    'outOfRangeDelaySeconds': outOfRangeDelaySeconds,
+    'enabled': enabled,
+  };
+
+  factory CoachingAlert.fromJson(Map<String, dynamic> json) => CoachingAlert(
+    id: json['id'] as String,
+    name: json['name'] as String,
+    metric: AlertMetric.values[json['metric'] as int? ?? 0],
+    minValue: (json['minValue'] as num?)?.toDouble() ?? 0,
+    maxValue: (json['maxValue'] as num?)?.toDouble() ?? 200,
+    okIntervalSeconds: json['okIntervalSeconds'] as int? ?? 120,
+    outOfRangeDelaySeconds: json['outOfRangeDelaySeconds'] as int? ?? 10,
+    enabled: json['enabled'] as bool? ?? true,
+  );
+
+  CoachingAlert copyWith({
+    String? id,
+    String? name,
+    AlertMetric? metric,
+    double? minValue,
+    double? maxValue,
+    int? okIntervalSeconds,
+    int? outOfRangeDelaySeconds,
+    bool? enabled,
+  }) => CoachingAlert(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    metric: metric ?? this.metric,
+    minValue: minValue ?? this.minValue,
+    maxValue: maxValue ?? this.maxValue,
+    okIntervalSeconds: okIntervalSeconds ?? this.okIntervalSeconds,
+    outOfRangeDelaySeconds:
+        outOfRangeDelaySeconds ?? this.outOfRangeDelaySeconds,
+    enabled: enabled ?? this.enabled,
+  );
+
+  /// Get current value for this coaching metric
+  double? getCurrentValue({
+    int? heartRate,
+    int? heartRateZone,
+    double? speedKmh,
+    double? paceMinPerKm,
+  }) {
+    switch (metric) {
+      case AlertMetric.bpm:
+        return heartRate?.toDouble();
+      case AlertMetric.hrZone:
+        return heartRateZone?.toDouble();
+      case AlertMetric.speed:
+        return speedKmh;
+      case AlertMetric.pace:
+        return paceMinPerKm;
+      default:
+        return null;
+    }
+  }
+
+  /// Build coaching message
+  String buildMessage(double currentValue, {bool speakUnits = true}) {
+    final unitText = speakUnits ? ' ${metric.unit}' : '';
+    if (currentValue >= minValue && currentValue <= maxValue) {
+      return '$name: tutto bene';
+    } else if (currentValue < minValue) {
+      final diff = (minValue - currentValue).toStringAsFixed(1);
+      return '$name: troppo basso, di $diff$unitText sotto il minimo';
+    } else {
+      final diff = (currentValue - maxValue).toStringAsFixed(1);
+      return '$name: troppo alto, di $diff$unitText sopra il massimo';
+    }
+  }
 }

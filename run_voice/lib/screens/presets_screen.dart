@@ -48,17 +48,6 @@ class PresetsScreen extends StatelessWidget {
                         ],
                       ),
                     ),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: IconButton(
-                        icon: const Icon(Icons.add, color: AppColors.primary),
-                        onPressed: () =>
-                            _showCreatePresetDialog(context, presetProvider),
-                      ),
-                    ),
                   ],
                 ),
               ),

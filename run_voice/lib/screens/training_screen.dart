@@ -28,7 +28,7 @@ class _TrainingScreenState extends State<TrainingScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     )..repeat(reverse: true);
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
   }
@@ -294,7 +294,7 @@ class _TrainingScreenState extends State<TrainingScreen>
     bool gpsAvailable,
     UserProvider userProvider,
   ) {
-    final canStart = selectedPreset != null && gpsAvailable;
+    final canStart = selectedPreset != null && gpsAvailable && btConnected;
 
     return AnimatedBuilder(
       animation: _pulseAnimation,
@@ -308,7 +308,10 @@ class _TrainingScreenState extends State<TrainingScreen>
               onPressed: canStart
                   ? () {
                       workoutProvider.setHRZones(userProvider.profile.hrZones);
-                      workoutProvider.startWorkout(selectedPreset);
+                      workoutProvider.startWorkout(
+                        selectedPreset,
+                        speakUnits: userProvider.profile.speakUnits,
+                      );
                     }
                   : null,
               style: ElevatedButton.styleFrom(

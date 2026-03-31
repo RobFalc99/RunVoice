@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import '../models/alert_config.dart';
 import '../utils/constants.dart';
 
-class AlertCard extends StatelessWidget {
-  final AlertConfig alert;
+class CoachingAlertCard extends StatelessWidget {
+  final CoachingAlert alert;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
   final ValueChanged<bool>? onToggle;
 
-  const AlertCard({
+  const CoachingAlertCard({
     super.key,
     required this.alert,
     this.onEdit,
@@ -33,27 +33,7 @@ class AlertCard extends StatelessWidget {
   }
 
   Color _getAlertColor() {
-    switch (alert.metric) {
-      case AlertMetric.hrZone:
-      case AlertMetric.bpm:
-        return AppColors.error;
-      case AlertMetric.distance:
-        return AppColors.success;
-      case AlertMetric.pace:
-      case AlertMetric.speed:
-        return AppColors.accent;
-      case AlertMetric.time:
-        return AppColors.warning;
-    }
-  }
-
-  String _formatInterval() {
-    final seconds = alert.intervalSeconds;
-    if (seconds < 60) return '${seconds}s';
-    final minutes = seconds ~/ 60;
-    final remainingSeconds = seconds % 60;
-    if (remainingSeconds == 0) return '${minutes}m';
-    return '${minutes}m ${remainingSeconds}s';
+    return AppColors.primary; // Coaching is primary colored
   }
 
   @override
@@ -114,16 +94,17 @@ class AlertCard extends StatelessWidget {
                       Row(
                         children: [
                           Icon(
-                            Icons.timer,
+                            Icons.track_changes,
                             size: 14,
                             color: AppColors.textMuted,
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            _formatInterval(),
+                            '${alert.minValue.toStringAsFixed(1)} - ${alert.maxValue.toStringAsFixed(1)}',
                             style: const TextStyle(
                               color: AppColors.textSecondary,
                               fontSize: 13,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -138,7 +119,7 @@ class AlertCard extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
-                                '${alert.metric.displayName} (${alert.mode.displayName})',
+                                alert.metric.displayName,
                                 style: TextStyle(
                                   color: color.withValues(alpha: 0.8),
                                   fontSize: 11,

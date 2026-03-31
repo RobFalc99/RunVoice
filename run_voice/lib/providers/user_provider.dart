@@ -16,7 +16,8 @@ class UserProvider extends ChangeNotifier {
       _profile = UserProfile.fromJsonString(jsonString);
     }
     // Initialize zones if empty
-    if (_profile.hrZones.isEmpty) {
+    // Initialize zones if empty and maxHR is set
+    if (_profile.hrZones.isEmpty && _profile.maxHeartRate > 0) {
       _profile.hrZones = HRZoneCalculator.generateZones(_profile.maxHeartRate);
     }
     notifyListeners();
@@ -60,14 +61,27 @@ class UserProvider extends ChangeNotifier {
     saveProfile();
   }
 
+  void updateSpeechRate(double rate) {
+    _profile.speechRate = rate;
+    saveProfile();
+  }
+
+  void updateSpeakUnits(bool value) {
+    _profile.speakUnits = value;
+    saveProfile();
+  }
+
   /// Recalculate zones from max HR
   void recalculateZones() {
-    _profile.hrZones = HRZoneCalculator.generateZones(_profile.maxHeartRate);
+    if (_profile.maxHeartRate > 0) {
+      _profile.hrZones = HRZoneCalculator.generateZones(_profile.maxHeartRate);
+    }
     saveProfile();
   }
 
   /// Calculate max HR from age and recalculate zones
   void calculateFromAge({bool useTanaka = true}) {
+    if (_profile.age <= 0) return;
     if (useTanaka) {
       _profile.maxHeartRate = HRZoneCalculator.calculateMaxHR(_profile.age);
     } else {
