@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../models/heart_rate_zone.dart';
 import '../utils/constants.dart';
 
@@ -74,7 +75,7 @@ class ZoneEditor extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: _BpmInput(
+                child: _BpmField(
                   label: 'Min BPM',
                   value: zone.minBpm,
                   color: color,
@@ -85,7 +86,7 @@ class ZoneEditor extends StatelessWidget {
               Icon(Icons.arrow_forward, color: AppColors.textMuted, size: 16),
               const SizedBox(width: 12),
               Expanded(
-                child: _BpmInput(
+                child: _BpmField(
                   label: 'Max BPM',
                   value: zone.maxBpm,
                   color: color,
@@ -100,18 +101,45 @@ class ZoneEditor extends StatelessWidget {
   }
 }
 
-class _BpmInput extends StatelessWidget {
+class _BpmField extends StatefulWidget {
   final String label;
   final int value;
   final Color color;
   final ValueChanged<int>? onChanged;
 
-  const _BpmInput({
+  const _BpmField({
     required this.label,
     required this.value,
     required this.color,
     this.onChanged,
   });
+
+  @override
+  State<_BpmField> createState() => _BpmFieldState();
+}
+
+class _BpmFieldState extends State<_BpmField> {
+  late TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: '${widget.value}');
+  }
+
+  @override
+  void didUpdateWidget(covariant _BpmField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.value != widget.value) {
+      _controller.text = '${widget.value}';
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -121,69 +149,43 @@ class _BpmInput extends StatelessWidget {
         color: AppColors.surfaceLight,
         borderRadius: BorderRadius.circular(10),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  color: AppColors.textMuted,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                '$value',
-                style: TextStyle(
-                  color: color,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
+          Text(
+            widget.label,
+            style: const TextStyle(
+              color: AppColors.textMuted,
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+            ),
           ),
-          const Spacer(),
-          Column(
-            children: [
-              _SmallButton(
-                icon: Icons.add,
-                onPressed: onChanged != null
-                    ? () => onChanged!(value + 1)
-                    : null,
+          const SizedBox(height: 2),
+          SizedBox(
+            height: 32,
+            child: TextField(
+              controller: _controller,
+              style: TextStyle(
+                color: widget.color,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
               ),
-              const SizedBox(height: 2),
-              _SmallButton(
-                icon: Icons.remove,
-                onPressed: onChanged != null
-                    ? () => onChanged!(value - 1)
-                    : null,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.zero,
               ),
-            ],
+              onChanged: (v) {
+                final val = int.tryParse(v);
+                if (val != null && val > 0 && val < 250) {
+                  widget.onChanged?.call(val);
+                }
+              },
+            ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _SmallButton extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback? onPressed;
-
-  const _SmallButton({required this.icon, this.onPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 24,
-      height: 24,
-      child: IconButton(
-        padding: EdgeInsets.zero,
-        icon: Icon(icon, size: 14, color: AppColors.textSecondary),
-        onPressed: onPressed,
       ),
     );
   }

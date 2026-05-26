@@ -13,12 +13,13 @@
     <!-- Foreground service for background tracking -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     
     <!-- Internet for Google Fonts -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="run_voice"
+        android:label="RunLiveCoach"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

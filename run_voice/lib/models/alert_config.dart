@@ -53,6 +53,22 @@ extension AlertMetricExtension on AlertMetric {
         return '';
     }
   }
+
+  /// Short spoken name for coaching messages
+  String get spokenName {
+    switch (this) {
+      case AlertMetric.speed:
+        return 'velocità';
+      case AlertMetric.pace:
+        return 'ritmo';
+      case AlertMetric.bpm:
+        return 'B P M';
+      case AlertMetric.hrZone:
+        return 'zona battiti';
+      default:
+        return displayName.toLowerCase();
+    }
+  }
 }
 
 /// The aggregation mode for the alert
@@ -78,13 +94,29 @@ extension AlertModeExtension on AlertMode {
   }
 }
 
+/// How to trigger the alert: every N seconds or every N meters
+enum AlertTrigger { time, distance }
+
+extension AlertTriggerExtension on AlertTrigger {
+  String get displayName {
+    switch (this) {
+      case AlertTrigger.time:
+        return 'Tempo';
+      case AlertTrigger.distance:
+        return 'Distanza';
+    }
+  }
+}
+
 /// A standard periodic alert that announces a metric value
 class AlertConfig {
   final String id;
   String name; // The text spoken by TTS
   AlertMetric metric;
   AlertMode mode;
-  int intervalSeconds;
+  AlertTrigger trigger;
+  int intervalSeconds; // Used when trigger == time
+  double intervalMeters; // Used when trigger == distance
   double lapDistanceKm; // Only used when mode == lap
   bool enabled;
 
@@ -93,7 +125,9 @@ class AlertConfig {
     required this.name,
     required this.metric,
     this.mode = AlertMode.current,
+    this.trigger = AlertTrigger.time,
     this.intervalSeconds = 60,
+    this.intervalMeters = 1000,
     this.lapDistanceKm = 1.0,
     this.enabled = true,
   });
@@ -249,7 +283,9 @@ class AlertConfig {
     'name': name,
     'metric': metric.index,
     'mode': mode.index,
+    'trigger': trigger.index,
     'intervalSeconds': intervalSeconds,
+    'intervalMeters': intervalMeters,
     'lapDistanceKm': lapDistanceKm,
     'enabled': enabled,
   };
@@ -259,7 +295,9 @@ class AlertConfig {
     name: json['name'] as String,
     metric: AlertMetric.values[json['metric'] as int? ?? 0],
     mode: AlertMode.values[json['mode'] as int? ?? 0],
+    trigger: AlertTrigger.values[json['trigger'] as int? ?? 0],
     intervalSeconds: json['intervalSeconds'] as int? ?? 60,
+    intervalMeters: (json['intervalMeters'] as num?)?.toDouble() ?? 1000,
     lapDistanceKm: (json['lapDistanceKm'] as num?)?.toDouble() ?? 1.0,
     enabled: json['enabled'] as bool? ?? true,
   );
@@ -269,7 +307,9 @@ class AlertConfig {
     String? name,
     AlertMetric? metric,
     AlertMode? mode,
+    AlertTrigger? trigger,
     int? intervalSeconds,
+    double? intervalMeters,
     double? lapDistanceKm,
     bool? enabled,
   }) => AlertConfig(
@@ -277,7 +317,9 @@ class AlertConfig {
     name: name ?? this.name,
     metric: metric ?? this.metric,
     mode: mode ?? this.mode,
+    trigger: trigger ?? this.trigger,
     intervalSeconds: intervalSeconds ?? this.intervalSeconds,
+    intervalMeters: intervalMeters ?? this.intervalMeters,
     lapDistanceKm: lapDistanceKm ?? this.lapDistanceKm,
     enabled: enabled ?? this.enabled,
   );
@@ -293,6 +335,10 @@ class CoachingAlert {
   int okIntervalSeconds; // How often to say "all good"
   int outOfRangeDelaySeconds; // How long out of range before alerting
   bool enabled;
+  bool speakCurrentValue; // If true, also say the current value
+  bool notifyOnReturn; // If true, say "all good" after outOfRangeDelaySeconds when returning in range
+  int? calculationWindowSeconds; // Window in seconds to calculate average. null/0 means instantaneous.
+  bool speakValueEvenWhenOk; // If true, say the current value even when saying all good (in range)
 
   CoachingAlert({
     required this.id,
@@ -303,6 +349,10 @@ class CoachingAlert {
     this.okIntervalSeconds = 120,
     this.outOfRangeDelaySeconds = 10,
     this.enabled = true,
+    this.speakCurrentValue = false,
+    this.notifyOnReturn = true,
+    this.calculationWindowSeconds = 0,
+    this.speakValueEvenWhenOk = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -314,6 +364,10 @@ class CoachingAlert {
     'okIntervalSeconds': okIntervalSeconds,
     'outOfRangeDelaySeconds': outOfRangeDelaySeconds,
     'enabled': enabled,
+    'speakCurrentValue': speakCurrentValue,
+    'notifyOnReturn': notifyOnReturn,
+    'calculationWindowSeconds': calculationWindowSeconds,
+    'speakValueEvenWhenOk': speakValueEvenWhenOk,
   };
 
   factory CoachingAlert.fromJson(Map<String, dynamic> json) => CoachingAlert(
@@ -325,6 +379,10 @@ class CoachingAlert {
     okIntervalSeconds: json['okIntervalSeconds'] as int? ?? 120,
     outOfRangeDelaySeconds: json['outOfRangeDelaySeconds'] as int? ?? 10,
     enabled: json['enabled'] as bool? ?? true,
+    speakCurrentValue: json['speakCurrentValue'] as bool? ?? false,
+    notifyOnReturn: json['notifyOnReturn'] as bool? ?? true,
+    calculationWindowSeconds: json['calculationWindowSeconds'] as int? ?? 0,
+    speakValueEvenWhenOk: json['speakValueEvenWhenOk'] as bool? ?? false,
   );
 
   CoachingAlert copyWith({
@@ -336,6 +394,10 @@ class CoachingAlert {
     int? okIntervalSeconds,
     int? outOfRangeDelaySeconds,
     bool? enabled,
+    bool? speakCurrentValue,
+    bool? notifyOnReturn,
+    int? calculationWindowSeconds,
+    bool? speakValueEvenWhenOk,
   }) => CoachingAlert(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -346,6 +408,11 @@ class CoachingAlert {
     outOfRangeDelaySeconds:
         outOfRangeDelaySeconds ?? this.outOfRangeDelaySeconds,
     enabled: enabled ?? this.enabled,
+    speakCurrentValue: speakCurrentValue ?? this.speakCurrentValue,
+    notifyOnReturn: notifyOnReturn ?? this.notifyOnReturn,
+    calculationWindowSeconds:
+        calculationWindowSeconds ?? this.calculationWindowSeconds,
+    speakValueEvenWhenOk: speakValueEvenWhenOk ?? this.speakValueEvenWhenOk,
   );
 
   /// Get current value for this coaching metric
@@ -369,17 +436,48 @@ class CoachingAlert {
     }
   }
 
-  /// Build coaching message
+  /// Build minimal coaching message
   String buildMessage(double currentValue, {bool speakUnits = true}) {
-    final unitText = speakUnits ? ' ${metric.unit}' : '';
+    String spoken = metric.spokenName;
+    if (metric == AlertMetric.bpm || metric == AlertMetric.hrZone) {
+      spoken = 'B P M';
+    }
+
+    String adjOk = 'tutto bene';
+    String adjLow = 'troppo basso';
+    String adjHigh = 'troppo alto';
+
+    if (metric == AlertMetric.bpm || metric == AlertMetric.hrZone) {
+      adjLow = 'troppo bassi';
+      adjHigh = 'troppo alti';
+    }
+
+    String formatValue(double val) {
+      if (metric == AlertMetric.pace) {
+        final minutes = val.floor();
+        final seconds = ((val - minutes) * 60).round();
+        return '$minutes:${seconds.toString().padLeft(2, '0')}';
+      }
+      return (metric == AlertMetric.bpm || metric == AlertMetric.hrZone)
+          ? val.toInt().toString()
+          : val.toStringAsFixed(1);
+    }
+
     if (currentValue >= minValue && currentValue <= maxValue) {
-      return '$name: tutto bene';
+      if (speakCurrentValue && speakValueEvenWhenOk) {
+        return '$spoken: $adjOk, a ${formatValue(currentValue)}';
+      }
+      return '$spoken: $adjOk';
     } else if (currentValue < minValue) {
-      final diff = (minValue - currentValue).toStringAsFixed(1);
-      return '$name: troppo basso, di $diff$unitText sotto il minimo';
+      if (speakCurrentValue) {
+        return '$spoken $adjLow, a ${formatValue(currentValue)}';
+      }
+      return '$spoken $adjLow';
     } else {
-      final diff = (currentValue - maxValue).toStringAsFixed(1);
-      return '$name: troppo alto, di $diff$unitText sopra il massimo';
+      if (speakCurrentValue) {
+        return '$spoken $adjHigh, a ${formatValue(currentValue)}';
+      }
+      return '$spoken $adjHigh';
     }
   }
 }

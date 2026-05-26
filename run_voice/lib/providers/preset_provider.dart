@@ -221,4 +221,57 @@ class PresetProvider extends ChangeNotifier {
       }
     }
   }
+
+  // INTERVALS
+  Future<void> addIntervalToPreset(String presetId, IntervalStep step) async {
+    final index = _presets.indexWhere((p) => p.id == presetId);
+    if (index != -1) {
+      _presets[index].intervals.add(step);
+      _presets[index].updatedAt = DateTime.now();
+      await _save();
+      notifyListeners();
+    }
+  }
+
+  Future<void> removeIntervalFromPreset(String presetId, String stepId) async {
+    final index = _presets.indexWhere((p) => p.id == presetId);
+    if (index != -1) {
+      _presets[index].intervals.removeWhere((s) => s.id == stepId);
+      _presets[index].updatedAt = DateTime.now();
+      await _save();
+      notifyListeners();
+    }
+  }
+
+  Future<void> updateIntervalInPreset(
+    String presetId,
+    IntervalStep step,
+  ) async {
+    final index = _presets.indexWhere((p) => p.id == presetId);
+    if (index != -1) {
+      final stepIndex = _presets[index].intervals.indexWhere(
+        (s) => s.id == step.id,
+      );
+      if (stepIndex != -1) {
+        _presets[index].intervals[stepIndex] = step;
+        _presets[index].updatedAt = DateTime.now();
+        await _save();
+        notifyListeners();
+      }
+    }
+  }
+
+  Future<void> duplicateIntervalInPreset(
+    String presetId,
+    IntervalStep step,
+  ) async {
+    final index = _presets.indexWhere((p) => p.id == presetId);
+    if (index != -1) {
+      final copy = step.copyWith(id: _uuid.v4());
+      _presets[index].intervals.add(copy);
+      _presets[index].updatedAt = DateTime.now();
+      await _save();
+      notifyListeners();
+    }
+  }
 }

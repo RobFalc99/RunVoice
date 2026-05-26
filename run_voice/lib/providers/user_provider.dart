@@ -71,6 +71,11 @@ class UserProvider extends ChangeNotifier {
     saveProfile();
   }
 
+  void updateSpeakName(bool value) {
+    _profile.speakName = value;
+    saveProfile();
+  }
+
   /// Recalculate zones from max HR
   void recalculateZones() {
     if (_profile.maxHeartRate > 0) {
@@ -92,15 +97,26 @@ class UserProvider extends ChangeNotifier {
     recalculateZones();
   }
 
-  /// Update a specific zone
+  /// Update a specific zone with cascading boundaries
   void updateZone(int zoneNumber, {int? minBpm, int? maxBpm}) {
-    final zoneIndex = _profile.hrZones.indexWhere(
-      (z) => z.zoneNumber == zoneNumber,
-    );
-    if (zoneIndex != -1) {
-      if (minBpm != null) _profile.hrZones[zoneIndex].minBpm = minBpm;
-      if (maxBpm != null) _profile.hrZones[zoneIndex].maxBpm = maxBpm;
-      saveProfile();
+    final zones = _profile.hrZones;
+    final zoneIndex = zones.indexWhere((z) => z.zoneNumber == zoneNumber);
+    if (zoneIndex == -1) return;
+
+    if (maxBpm != null) {
+      zones[zoneIndex].maxBpm = maxBpm;
+      // Cascade: set next zone's minBpm = maxBpm + 1
+      if (zoneIndex + 1 < zones.length) {
+        zones[zoneIndex + 1].minBpm = maxBpm + 1;
+      }
     }
+    if (minBpm != null) {
+      zones[zoneIndex].minBpm = minBpm;
+      // Cascade: set previous zone's maxBpm = minBpm - 1
+      if (zoneIndex - 1 >= 0) {
+        zones[zoneIndex - 1].maxBpm = minBpm - 1;
+      }
+    }
+    saveProfile();
   }
 }

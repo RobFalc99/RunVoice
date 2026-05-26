@@ -167,13 +167,22 @@ class PresetTile extends StatelessWidget {
                   children: [
                     _InfoChip(
                       icon: Icons.notifications_active,
-                      label: '${preset.activeAlertCount} avvisi attivi',
+                      label:
+                          '${preset.activeAlertCount + preset.activeCoachingCount} attivi',
                     ),
                     const SizedBox(width: 10),
                     _InfoChip(
                       icon: Icons.list,
-                      label: '${preset.alerts.length} totali',
+                      label:
+                          '${preset.alerts.length + preset.coachingAlerts.length} totali',
                     ),
+                    if (preset.coachingAlerts.isNotEmpty) ...[
+                      const SizedBox(width: 10),
+                      _InfoChip(
+                        icon: Icons.sports,
+                        label: '${preset.activeCoachingCount} coaching',
+                      ),
+                    ],
                   ],
                 ),
               ],

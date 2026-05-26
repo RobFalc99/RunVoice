@@ -29,6 +29,7 @@ class AppColors {
   static const Color info = Color(0xFF58A6FF);
 
   // HR Zones
+  static const Color zone0 = Color(0xFF6E7681); // Resting - Gray
   static const Color zone1 = Color(0xFF58A6FF); // Recovery - Blue
   static const Color zone2 = Color(0xFF3FB950); // Aerobic - Green
   static const Color zone3 = Color(0xFFD29922); // Tempo - Yellow
@@ -37,6 +38,8 @@ class AppColors {
 
   static Color getZoneColor(int zone) {
     switch (zone) {
+      case 0:
+        return zone0;
       case 1:
         return zone1;
       case 2:
@@ -189,14 +192,16 @@ class AppTheme {
 
 class HRZoneDefaults {
   static const List<String> zoneNames = [
-    'Zone 1 - Recovery',
-    'Zone 2 - Aerobic',
-    'Zone 3 - Tempo',
-    'Zone 4 - Threshold',
-    'Zone 5 - Maximum',
+    'Zone 0 - Riposo',
+    'Zone 1 - Riscaldamento',
+    'Zone 2 - Aerobica',
+    'Zone 3 - Ritmo',
+    'Zone 4 - Soglia',
+    'Zone 5 - Massima',
   ];
 
   static const List<List<double>> zonePercentages = [
+    [0.0, 0.50], // Zone 0
     [0.50, 0.60], // Zone 1
     [0.60, 0.70], // Zone 2
     [0.70, 0.80], // Zone 3

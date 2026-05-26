@@ -93,7 +93,7 @@ class CoachingAlertCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.track_changes,
                             size: 14,
                             color: AppColors.textMuted,
@@ -107,6 +107,23 @@ class CoachingAlertCard extends StatelessWidget {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
+                          if (alert.calculationWindowSeconds != null && alert.calculationWindowSeconds! > 0) ...[
+                            const SizedBox(width: 8),
+                            const Icon(
+                              Icons.timelapse,
+                              size: 14,
+                              color: AppColors.textMuted,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Media ${alert.calculationWindowSeconds! ~/ 60}:${(alert.calculationWindowSeconds! % 60).toString().padLeft(2, '0')}',
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                           const SizedBox(width: 12),
                           Flexible(
                             child: Container(

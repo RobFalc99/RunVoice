@@ -14,10 +14,10 @@ class HRZoneCalculator {
 
   /// Generate default HR zones based on max heart rate
   static List<HeartRateZone> generateZones(int maxHR) {
-    return List.generate(5, (index) {
+    return List.generate(6, (index) {
       final percentages = HRZoneDefaults.zonePercentages[index];
       return HeartRateZone(
-        zoneNumber: index + 1,
+        zoneNumber: index,
         name: HRZoneDefaults.zoneNames[index],
         minBpm: (maxHR * percentages[0]).round(),
         maxBpm: (maxHR * percentages[1]).round(),
@@ -34,7 +34,7 @@ class HRZoneCalculator {
         return zone.zoneNumber;
       }
     }
-    // Below zone 1
+    // Below zone 0
     if (zones.isNotEmpty && bpm < zones.first.minBpm) {
       return 0;
     }

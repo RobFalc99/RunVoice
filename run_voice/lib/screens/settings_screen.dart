@@ -6,6 +6,7 @@ import '../providers/location_provider.dart';
 import '../providers/tts_provider.dart';
 import '../widgets/zone_editor.dart';
 import '../widgets/sensor_status_card.dart';
+import '../widgets/bluetooth_device_dialog.dart';
 import '../utils/constants.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -188,6 +189,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 8),
+
+          // Pronuncia Nome Switch
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text(
+              'Usa il tuo nome negli avvisi',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            subtitle: const Text(
+              'Es: "Ciao Marco, allenamento iniziato"',
+              style: TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 12,
+              ),
+            ),
+            activeThumbColor: AppColors.primary,
+            value: userProvider.profile.speakName,
+            onChanged: (val) {
+              userProvider.updateSpeakName(val);
+            },
           ),
           const SizedBox(height: 12),
 
@@ -493,7 +520,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 fontWeight: FontWeight.w500,
               ),
             ),
-            activeColor: AppColors.primary,
+            activeThumbColor: AppColors.primary,
             value: userProvider.profile.speakUnits,
             onChanged: (val) {
               userProvider.updateSpeakUnits(val);
@@ -527,194 +554,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModalState) {
-          return Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceHighlight,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'Sensori Bluetooth',
-                        style: TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    if (btProvider.isConnected)
-                      TextButton(
-                        onPressed: () async {
-                          await btProvider.disconnect();
-                          setModalState(() {});
-                        },
-                        child: const Text(
-                          'Disconnetti',
-                          style: TextStyle(color: AppColors.error),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                if (btProvider.isConnected) ...[
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppColors.success.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: AppColors.success.withValues(alpha: 0.3),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.bluetooth_connected,
-                          color: AppColors.success,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                btProvider.connectedDeviceName ?? 'Connesso',
-                                style: const TextStyle(
-                                  color: AppColors.textPrimary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Text(
-                                '${btProvider.heartRate} BPM',
-                                style: const TextStyle(
-                                  color: AppColors.success,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ] else ...[
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton.icon(
-                      onPressed: btProvider.isScanning
-                          ? null
-                          : () async {
-                              await btProvider.startScan();
-                              setModalState(() {});
-                            },
-                      icon: btProvider.isScanning
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Icon(Icons.bluetooth_searching),
-                      label: Text(
-                        btProvider.isScanning
-                            ? 'Ricerca in corso...'
-                            : 'Cerca sensori',
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  if (btProvider.scanResults.isNotEmpty)
-                    SizedBox(
-                      height: 250,
-                      child: ListView.builder(
-                        itemCount: btProvider.scanResults.length,
-                        itemBuilder: (ctx, index) {
-                          final result = btProvider.scanResults[index];
-                          final name = result.device.platformName.isNotEmpty
-                              ? result.device.platformName
-                              : 'Dispositivo sconosciuto';
-                          return ListTile(
-                            leading: const Icon(
-                              Icons.bluetooth,
-                              color: AppColors.info,
-                            ),
-                            title: Text(
-                              name,
-                              style: const TextStyle(
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            subtitle: Text(
-                              'RSSI: ${result.rssi} dBm',
-                              style: const TextStyle(
-                                color: AppColors.textMuted,
-                                fontSize: 12,
-                              ),
-                            ),
-                            trailing: const Icon(
-                              Icons.arrow_forward_ios,
-                              size: 16,
-                              color: AppColors.textMuted,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            onTap: () async {
-                              final success = await btProvider.connectToDevice(
-                                result,
-                              );
-                              if (success && ctx.mounted) {
-                                setModalState(() {});
-                              }
-                            },
-                          );
-                        },
-                      ),
-                    )
-                  else if (!btProvider.isScanning)
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      child: const Center(
-                        child: Text(
-                          'Nessun sensore trovato.\nPremi "Cerca sensori" per iniziare.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: AppColors.textMuted,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-
-                const SizedBox(height: 20),
-              ],
-            ),
-          );
-        },
-      ),
+      builder: (ctx) => const BluetoothDeviceDialog(),
     );
   }
 }

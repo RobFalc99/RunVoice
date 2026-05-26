@@ -12,8 +12,9 @@ class UserProfile {
   String? connectedSensorId;
   String? connectedSensorName;
   // Voice settings
-  double speechRate; // 1.0, 1.25, 1.5, 1.75, 2.0
+  double speechRate;
   bool speakUnits; // Whether to speak unit names
+  bool speakName; // Whether to announce the name
 
   UserProfile({
     this.firstName = '',
@@ -27,6 +28,7 @@ class UserProfile {
     this.connectedSensorName,
     this.speechRate = 1.0,
     this.speakUnits = true,
+    this.speakName = true,
   }) : hrZones = hrZones ?? [];
 
   String get displayName {
@@ -48,6 +50,7 @@ class UserProfile {
     'connectedSensorName': connectedSensorName,
     'speechRate': speechRate,
     'speakUnits': speakUnits,
+    'speakName': speakName,
   };
 
   factory UserProfile.fromJsonString(String jsonString) =>
@@ -67,5 +70,6 @@ class UserProfile {
     connectedSensorName: json['connectedSensorName'] as String?,
     speechRate: (json['speechRate'] as num?)?.toDouble() ?? 1.0,
     speakUnits: json['speakUnits'] as bool? ?? true,
+    speakName: json['speakName'] as bool? ?? true,
   );
 }

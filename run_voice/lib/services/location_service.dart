@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class LocationService {
   StreamSubscription<Position>? _positionSubscription;
@@ -44,6 +46,16 @@ class LocationService {
   /// Request location permissions
   Future<bool> requestPermissions() async {
     try {
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        // Richiedi i permessi notification and battery optimization (critici per Foreground Service su Android 13+)
+        if (await Permission.notification.isDenied) {
+          await Permission.notification.request();
+        }
+        if (await Permission.ignoreBatteryOptimizations.isDenied) {
+          await Permission.ignoreBatteryOptimizations.request();
+        }
+      }
+
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) return false;
 
@@ -81,10 +93,34 @@ class LocationService {
     _currentPaceMinPerKm = 0;
     _isTracking = true;
 
-    const locationSettings = LocationSettings(
-      accuracy: LocationAccuracy.high,
-      distanceFilter: 5, // Update every 5 meters
-    );
+    late LocationSettings locationSettings;
+
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      locationSettings = AndroidSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 5, // Update every 5 meters
+        forceLocationManager: true,
+        foregroundNotificationConfig: const ForegroundNotificationConfig(
+          notificationText: "L'app sta tracciando la tua posizione",
+          notificationTitle: "Allenamento Iniziato",
+          enableWakeLock: true,
+        ),
+      );
+    } else if (defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.macOS) {
+      locationSettings = AppleSettings(
+        accuracy: LocationAccuracy.high,
+        activityType: ActivityType.fitness,
+        distanceFilter: 5,
+        pauseLocationUpdatesAutomatically: false,
+        showBackgroundLocationIndicator: true,
+      );
+    } else {
+      locationSettings = const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 5,
+      );
+    }
 
     _positionSubscription =
         Geolocator.getPositionStream(locationSettings: locationSettings).listen(
@@ -102,7 +138,7 @@ class LocationService {
               );
 
               // Only count if distance is reasonable (filter GPS noise)
-              if (distance > 1 && distance < 100) {
+              if (distance > 1 && distance < 200) {
                 _totalDistanceMeters += distance;
                 onDistanceUpdate?.call(totalDistanceKm);
 

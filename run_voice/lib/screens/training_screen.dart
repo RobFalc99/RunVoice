@@ -7,6 +7,8 @@ import '../providers/workout_provider.dart';
 import '../providers/user_provider.dart';
 import '../widgets/sensor_status_card.dart';
 import '../widgets/metric_display.dart';
+import '../widgets/bluetooth_device_dialog.dart';
+import '../models/alert_config.dart';
 import '../utils/constants.dart';
 
 class TrainingScreen extends StatefulWidget {
@@ -159,9 +161,10 @@ class _TrainingScreenState extends State<TrainingScreen>
                         title: 'Battito Cardiaco',
                         subtitle: bluetoothProvider.isConnected
                             ? '${bluetoothProvider.connectedDeviceName} - ${bluetoothProvider.heartRate} BPM'
-                            : 'Non connesso',
+                            : 'Non connesso - tocca per connettere',
                         icon: Icons.favorite,
                         isConnected: bluetoothProvider.isConnected,
+                        onTap: () => _showBluetoothDialog(bluetoothProvider),
                       ),
                     ],
                   ),
@@ -273,7 +276,7 @@ class _TrainingScreenState extends State<TrainingScreen>
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  '${selectedPreset.activeAlertCount} avvisi attivi su ${selectedPreset.alerts.length}',
+                  '${selectedPreset.activeAlertCount + selectedPreset.activeCoachingCount} avvisi attivi su ${selectedPreset.alerts.length + selectedPreset.coachingAlerts.length}',
                   style: const TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 13,
@@ -311,6 +314,8 @@ class _TrainingScreenState extends State<TrainingScreen>
                       workoutProvider.startWorkout(
                         selectedPreset,
                         speakUnits: userProvider.profile.speakUnits,
+                        userName: userProvider.profile.firstName,
+                        speakName: userProvider.profile.speakName,
                       );
                     }
                   : null,
@@ -357,6 +362,10 @@ class _TrainingScreenState extends State<TrainingScreen>
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
+            if (wp.activePreset?.isIntervalTraining == true) ...[
+              _buildIntervalProgressCard(wp),
+              const SizedBox(height: 16),
+            ],
             // Timer
             Container(
               width: double.infinity,
@@ -466,12 +475,11 @@ class _TrainingScreenState extends State<TrainingScreen>
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: MetricDisplay(
-                    label: 'PASSO',
-                    value: _formatPace(wp.paceMinPerKm),
-                    unit: '/km',
-                    icon: Icons.speed,
-                    color: AppColors.accent,
+                  child: _PaceSlidableBox(
+                    currentPace: wp.paceMinPerKm,
+                    averagePace: wp.distanceKm > 0 
+                        ? (wp.elapsedTime.inSeconds / 60) / wp.distanceKm 
+                        : 0.0,
                   ),
                 ),
               ],
@@ -568,6 +576,345 @@ class _TrainingScreenState extends State<TrainingScreen>
             child: const Text('Termina'),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showBluetoothDialog(BluetoothProvider btProvider) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => const BluetoothDeviceDialog(),
+    );
+  }
+
+  Widget _buildIntervalProgressCard(WorkoutProvider wp) {
+    final preset = wp.activePreset;
+    if (preset == null || preset.intervals.isEmpty) return const SizedBox();
+
+    final currentIndex = wp.currentIntervalIndex;
+    final totalSteps = preset.intervals.length;
+    
+    if (currentIndex >= totalSteps) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.check_circle, color: AppColors.success, size: 24),
+            SizedBox(width: 12),
+            Text(
+              'Ripetute completate!',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final currentStep = preset.intervals[currentIndex];
+    
+    String progressText = '';
+    double progressPercent = 0.0;
+    
+    if (currentStep.type == AlertTrigger.time) {
+      final elapsedInStep = wp.elapsedTime - wp.currentIntervalStartTime;
+      final elapsedSeconds = elapsedInStep.inSeconds;
+      final targetSeconds = currentStep.durationSeconds;
+      progressPercent = (elapsedSeconds / targetSeconds).clamp(0.0, 1.0);
+      progressText = '${_formatDuration(elapsedInStep)} / ${_formatDuration(Duration(seconds: targetSeconds))}';
+    } else {
+      final elapsedDistanceKm = wp.distanceKm - wp.currentIntervalStartDistanceKm;
+      final elapsedMeters = elapsedDistanceKm * 1000;
+      final targetMeters = currentStep.distanceMeters;
+      progressPercent = (elapsedMeters / targetMeters).clamp(0.0, 1.0);
+      progressText = '${elapsedMeters.round()}m / ${targetMeters.round()}m';
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'FASE ${currentIndex + 1} DI $totalSteps',
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Icon(
+                currentStep.type == AlertTrigger.time ? Icons.timer : Icons.straighten,
+                color: AppColors.accent,
+                size: 18,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            currentStep.name,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                progressText,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  fontFeatures: [FontFeature.tabularFigures()],
+                ),
+              ),
+              Text(
+                '${(progressPercent * 100).round()}%',
+                style: const TextStyle(
+                  color: AppColors.accent,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  fontFeatures: [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progressPercent,
+              minHeight: 8,
+              backgroundColor: AppColors.surfaceHighlight,
+              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Divider(color: AppColors.surfaceHighlight, height: 1),
+          const SizedBox(height: 12),
+          const Text(
+            'STORICO E SEQUENZA FASI',
+            style: TextStyle(
+              color: AppColors.textMuted,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.8,
+            ),
+          ),
+          const SizedBox(height: 8),
+          
+          SizedBox(
+            height: 75,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: totalSteps,
+              itemBuilder: (context, index) {
+                final step = preset.intervals[index];
+                final isCompleted = index < currentIndex;
+                final isActive = index == currentIndex;
+                
+                Color cardBg = AppColors.surfaceLight;
+                Color borderColor = Colors.transparent;
+                Color textColor = AppColors.textSecondary;
+                Color durationColor = AppColors.textMuted;
+                
+                if (isActive) {
+                  cardBg = AppColors.primary.withValues(alpha: 0.1);
+                  borderColor = AppColors.primary;
+                  textColor = AppColors.textPrimary;
+                  durationColor = AppColors.primaryLight;
+                } else if (isCompleted) {
+                  textColor = AppColors.textMuted;
+                  durationColor = AppColors.textMuted.withValues(alpha: 0.5);
+                }
+                
+                return Container(
+                  width: 140,
+                  margin: const EdgeInsets.only(right: 10),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: cardBg,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: borderColor),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Row(
+                        children: [
+                          if (isCompleted)
+                            const Icon(Icons.check_circle, color: AppColors.success, size: 14)
+                          else if (isActive)
+                            const Icon(Icons.play_circle_filled, color: AppColors.primary, size: 14)
+                          else
+                            const Icon(Icons.circle_outlined, color: AppColors.textMuted, size: 14),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              '${index + 1}. ${step.name}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: textColor,
+                                fontSize: 12,
+                                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        step.displayDuration,
+                        style: TextStyle(
+                          color: durationColor,
+                          fontSize: 11,
+                          fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PaceSlidableBox extends StatefulWidget {
+  final double currentPace;
+  final double averagePace;
+
+  const _PaceSlidableBox({required this.currentPace, required this.averagePace});
+
+  @override
+  State<_PaceSlidableBox> createState() => _PaceSlidableBoxState();
+}
+
+class _PaceSlidableBoxState extends State<_PaceSlidableBox> {
+  final PageController _controller = PageController();
+
+  String _formatPace(double paceMinPerKm) {
+    if (paceMinPerKm <= 0 || paceMinPerKm.isInfinite || paceMinPerKm.isNaN) {
+      return '--:--';
+    }
+    final minutes = paceMinPerKm.floor();
+    final seconds = ((paceMinPerKm - minutes) * 60).round();
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Opacity(
+          opacity: 0,
+          child: const MetricDisplay(
+            label: 'PASSO MEDIO',
+            value: '00:00',
+            unit: '/km',
+            icon: Icons.speed,
+          ),
+        ),
+        Positioned.fill(
+          child: PageView(
+            controller: _controller,
+            children: [
+              MetricDisplay(
+                label: 'PASSO ATT.',
+                value: _formatPace(widget.currentPace),
+                unit: '/km',
+                icon: Icons.speed,
+                color: AppColors.accent,
+              ),
+              MetricDisplay(
+                label: 'PASSO MEDIO',
+                value: _formatPace(widget.averagePace),
+                unit: '/km',
+                icon: Icons.speed,
+                color: AppColors.accent,
+              ),
+            ],
+          ),
+        ),
+        Positioned(
+          bottom: 8,
+          left: 0,
+          right: 0,
+          child: AnimatedBuilder(
+            animation: _controller,
+            builder: (context, _) {
+              final page = _controller.hasClients && _controller.position.haveDimensions
+                  ? _controller.page ?? 0.0
+                  : 0.0;
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildDot(page, 0),
+                  const SizedBox(width: 4),
+                  _buildDot(page, 1),
+                ],
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDot(double currentPage, int index) {
+    final isActive = (currentPage.round() == index);
+    return Container(
+      width: 6,
+      height: 6,
+      decoration: BoxDecoration(
+        color: isActive ? AppColors.accent : AppColors.surfaceHighlight,
+        shape: BoxShape.circle,
       ),
     );
   }
