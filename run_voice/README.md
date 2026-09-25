@@ -1,51 +1,162 @@
-# RunVoice 🏃‍♂️🎧
+<div align="center">
 
-RunVoice è un assistente alla corsa smart, minimale e progettato attorno al concetto di "voce" e "invisibilità". L'obiettivo dell'applicazione è fornire agli atleti tutte le metriche cruciali dell'allenamento (passo, distanza, frequenza cardiaca) tramite feedback audio fluido e non intrusivo. In questo modo il runner può mantenere alta la concentrazione sul tracciato e la tecnica di corsa, senza necessità di guardare lo schermo.
+  <img src="assets/icon.png" width="120" height="120" alt="RunLiveCoach Logo" style="border-radius: 24px;" />
 
----
+  # RunLiveCoach 🏃‍♂️🎧
+  ### *L'Assistente Vocale Intelligente per la Corsa & Interval Training*
 
-## 🎯 Funzionalità Principali (User Perspective)
+  [![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
+  [![Dart](https://img.shields.io/badge/Dart-3.x-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev)
+  [![Platform](https://img.shields.io/badge/Platform-Android-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://android.com)
+  [![License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
 
-Dal punto di vista dell'utente finale, RunVoice offre:
+  <p align="center">
+    <b>Un'esperienza di corsa a mani libere e zero distrazioni.</b><br>
+    Metriche in tempo reale, coaching vocale su frequenza cardiaca/passo e gestione completa delle ripetute, tutto guidato dalla voce senza dover guardare lo schermo.
+  </p>
 
-1. **Zero Distrazioni Visuali**: Un'interfaccia utente pulita, esteticamente moderna e dark, caratterizzata da colori vibranti per le varie dashboard di lettura, la cui funzione base è principalmente impostare la dinamica della corsa prima di cominciare, ignorando controlli macchinosi post-avvio.
-2. **Rilevamento GPS e Metriche Avanzate**: Calcolo istantaneo di metriche fisiche come *Distanza (km)*, *Passo (min/km)* e *Velocità (km/h)*, con logiche anti-interferenza per escludere eventuali balzi o buchi di copertura (filtri sul track point).
-3. **Bluetooth BLE Cardio (Frequenza Cardiaca)**: Abbinamento diretto a un dispositivo Bluetooth (Fasce Garmin, Polar, e persino array proprietari in broadcast HR mode come i wearable Whoop). Aggancio intelligente e metriche calcolate in BPM reali.
-4. **Calcolo Zone Cardiache Reale (Tanaka)**: Implementazione strutturata e metodologica delle zone cardiache (dalla vitale *Zona 0* al bottom up della *Zona 5*) inquadrati al millimetro usando il calcolo dell'HR Massimo formula Tanaka.
-5. **Vocalità TTS Dinamica (Audio Focus)**: I comandi vocali vengono letti senza interrompere il podcast o la musica dell'utente, bensì posizionandoli "sotto" momentaneamente (Audio Ducking/Attenuazione Categoria OS iOS/Android). Il sistema processa testi logici italiani con corretta interpolazione singolare/plurale o decifrazione delle unità misurative (*Es: pronuncia B P M e non battiti anonimi*).
-6. **Profili Allenamento ed Editor (Preset)**:
-    - **Avvisi Periodici**: Possibilità di domandarsi il "come sto andando?" scansionando ciclicamente. Es: *“Ogni 1000m, fammi il punto della situazione su distanza e battiti”*.
-    - **Modalità Coaching Mentore**: Controllo stretto continuo. Puoi dare limitazioni (Es. *"Non andare oltre i 160 BPM e non andare più lento di 5 min/km"*). Se la tendenza fuoriesce, la coach voice ti informerà avvisandoti specificatamente che un parametro risulta troppo basso o troppo alto finché non recuperi, rincuorandoti quando torni nel range stabilito.
-    - **Super Profilo (Modalità Ripetute)**: Allenamento configurabile step by step (Flessibile Corsa/Riposo o Fartlek). Si avvalora di una schermata a schede copiabili. La logica prenderà interamente il controllo, indicando il cambio fase, gestendo per te il timer intervallo o i metri da fare tra il passo precedente e il passo successivo.
-
----
-
-## 🖥️ Implementazione & Struttura (Tech Perspective)
-
-Architettura del progetto basata sull'SDK di **Flutter**, orientata alla modularizzazione ed al multi-threading. La logica asincrona sfrutta le potenze del Provider e Service Pattern per isolare ed estendere individualmente le singole sfaccettature dell'app.
-
-### Core Architecture & State Management:
-- **Provider Pattern (`ChangeNotifier`)**: Cuore pulsante che smista il flusso di ascolto fra la dashboard UI e i servizi isolati di stato (`PresetProvider` per i settaggi salvati serialmente via SharedPreferences, `WorkoutProvider` per i flussi e delta attivi nel training corrente).
-- **Service Layers autonomi**:
-  - `TtsService`: Controlla ed incapsula completamente le dipendenze `flutter_tts`. Alloca la coda FIFO per gli stream vocali e setta l'`AudioCategory` del sistema operativo host per dominare i privilegi di Ducking (silenziare le terze parti).
-  - `LocationService`: Disaccoppiato dai layer grafici, lavora col pacchetto `geolocator`. Valuta le coordinate GPS, confronta i delta vector position per mitigare il rumore e i dropout del ricevitore satellite, gestisce la richiesta di permesso.
-  - `HRBluetoothService`: Scanner puro dei dispositivi Bluetooth, interpreta lo Standard Heart Rate profile e le relative `Characteristics` dei sensori BLE emersi per spingere un stream perpetuo in direzione del core tracker.
-  - `WorkoutService`: L'Intelligenza Virtuale. Integra il tick 1-second interval che muove i check d'analisi incrociando i provider fisici. Mantiene l'allineamento dei "checkpoint" metrologici, giudicando quando invocare l'aiuto dell'engine di TTS a seconda della modalità attivabile (TimeInterval, DistanceTrigger o Coaching threshold).
-
-### Models ed Entità Chiave:
-Tutti i settings e avvisi sono descritti tramite entità solidissime:
-- `Preset`: Categoria ombrello di uno scenario (`"Maratona di Roma"`, `"Recupero in soglia"` etc)
-- `AlertConfig` & `CoachingAlert`: Sotto-modelli che processano formule in base ad aggregazioni di TargetMetrics. Generano autonomamente lo scaffold logico della stringa in italiano basandosi sul loro context ed eventuale limite (Enum).
-- `IntervalStep`: Un singolo "passo" di vita misurabile di un set di ripetute, reppresentante i requisiti trigger prima del drop temporale verso quello cronologicamente successivo. 
+</div>
 
 ---
 
-## 🚀 Setup & Note di Lancio
+## 📱 Screenshots dell'Applicazione
 
-- Essendo un'applicazione di navigatore atletico, i permessi di rilevazione Bluetooth Scanning / Connect e GPS sono bloccanti per l'avvio sensoriale.
-- Particolare attenzione necessita sui settaggi del dispositivo target che deve prevedere l'esecuzione in *Background Illimitato* (Nessun risparmio energetico attivato sulle query di Localizzazione o Bluetooth OS). La privazione di tali diritti farebbe saltare il sync GPS a schermo spento, perdendo l'effettivo delta chilometrico della traccia.
-- Testare accuratamente con `flutter run --release` o installare la release di build `.apk` / `.ipa`, specialmente qualora volessi misurare reattività di rendering dei frame colorimetrici e fluidità dei layer vocali che in Debug potrebbero soffrire di de-sync jitter.
+<div align="center">
+  <table>
+    <tr>
+      <td align="center" width="33%">
+        <b>⚡ Live Workout Dashboard</b><br><br>
+        <img src="assets/screenshots/workout.jpg" width="280" alt="Live Workout Dashboard" /><br><br>
+        <em>Timer, BPM dinamico, Zone FC, Distanza e box Passo slidabile (attuale/medio).</em>
+      </td>
+      <td align="center" width="33%">
+        <b>🎯 Editor Ripetute & Coaching</b><br><br>
+        <img src="assets/screenshots/presets.jpg" width="280" alt="Preset & Ripetute Editor" /><br><br>
+        <em>Sequenze di ripetute a step, target BPM numerici e avviso rientro in soglia.</em>
+      </td>
+      <td align="center" width="33%">
+        <b>⚙️ Zone Cardio & Voce</b><br><br>
+        <img src="assets/screenshots/settings.jpg" width="280" alt="Settings Screen" /><br><br>
+        <em>Calcolo Tanaka/Classico HR Max, Zone Z0-Z5 personalizzabili e opzioni TTS.</em>
+      </td>
+    </tr>
+  </table>
+</div>
 
-### 📦 Compilazione Rapida dell'APK (Scorciatoia Windows)
-Per facilitare lo sviluppo e la generazione rapida dell'APK senza dover navigare o digitare comandi lunghi ogni volta, è presente uno script di utilità nativo nella radice del progetto:
-* **`build_apk.bat`**: Esegue automaticamente il cambio directory alla cartella del progetto corretta (`[04] RunVoice`), lancia `flutter build apk --release` usando l'ambiente Windows locale e mantiene aperta la finestra al termine, indicando l'esatto percorso del file APK compilato. Puoi eseguirlo con un semplice doppio clic da Windows Explorer o digitando `.\build_apk.bat` in PowerShell.
+---
+
+## 🌟 Caratteristiche Principali
+
+### 🎧 1. Assistente Vocale Smart (Audio Ducking & Focus)
+* **Feedback vocale naturale:** Annunci vocali intelligenti con gestione grammaticale corretta in italiano (*B P M*, plurali e singolari dinamici).
+* **Audio Ducking:** Quando l'assistente parla, abbassa temporaneamente il volume della tua musica o dei podcast senza interromperli.
+* **Saluto personalizzato:** Opzione per farsi chiamare per nome all'inizio di ogni sessione di corsa.
+
+### 🏃‍♂️ 2. Gestione Avanzata Ripetute (Interval Training)
+* **Super Profili:** Configura step alternati (es. *1000m veloci + 2 min recupero*) basati su distanza o tempo.
+* **Duplicazione rapida:** Crea routine complesse con pochi tocchi duplicando i singoli step.
+* **Notifiche di transizione:** La voce ti segnala automaticamente il cambio di fase e l'obiettivo da mantenere.
+
+### ❤️ 3. Monitoraggio Cardio BLE & Calcolo Zone Reali
+* **Connessione BLE universale:** Compatibile con fasce cardio (Polar, Garmin) e dispositivi in broadcast HR (Whoop, smartwatch).
+* **Formule Tanaka & Classica:** Calcolo automatico della frequenza cardiaca massima ($208 - 0.7 \times \text{età}$ oppure $220 - \text{età}$).
+* **6 Zone Cardiache (Zona 0 - Zona 5):** Soglie totalmente personalizzabili con aggiornamento a cascata.
+
+### 🎯 4. Coaching Zone Proattivo
+* **Controllo Range:** Imposta target di frequenza cardiaca (BPM o Zona) o di passo.
+* **Avvisi fuori range:** Se esci dalla soglia target, il coach ti avvisa dopo un ritardo configurabile (*es. 10s*).
+* **Avviso rapido di rientro:** Ricevi subito conferma quando sei tornato nella frequenza corretta senza aspettare l'intervallo completo.
+
+### 📍 5. GPS Anti-Dropout & Tracciamento in Background
+* **Foreground Service Android:** Servizio in primo piano con notifica persistente per evitare che il sistema operativo uccida il GPS a schermo spento.
+* **Bypass Battery Optimization:** Richiesta guidata dei permessi per impedire lo sleep forzato su dispositivi Samsung, Xiaomi, Huawei, etc.
+* **Passo Istantaneo e Medio Slidabile:** Riquadro interattivo nella schermata principale per passare con uno swipe dal passo istantaneo al passo medio globale.
+
+---
+
+## 🏗️ Architettura Software
+
+Il progetto adotta un'architettura modulare e pulita costruita attorno al **Provider Pattern** di Flutter e a Service Layer disaccoppiati:
+
+```
+lib/
+├── models/               # Entità dati e configurazioni
+│   ├── alert_config.dart     # Modelli per Avvisi Periodici & Coaching
+│   ├── heart_rate_zone.dart  # Definizione e soglie delle Zone Cardio (0-5)
+│   ├── preset.dart           # Preset di allenamento e Step Ripetute
+│   └── user_profile.dart     # Profilo utente, formule FC e impostazioni TTS
+├── providers/            # State Management (ChangeNotifier)
+│   ├── bluetooth_provider.dart
+│   ├── location_provider.dart
+│   ├── preset_provider.dart
+│   ├── tts_provider.dart
+│   ├── user_provider.dart
+│   └── workout_provider.dart
+├── screens/              # Schermate dell'applicazione
+│   ├── preset_editor_screen.dart # Editor avanzato preset e ripetute
+│   ├── settings_screen.dart      # Profilo, Zone Cardio e Voce
+│   └── training_screen.dart      # Dashboard live allenamento e avvio
+├── services/             # Layer di I/O, Sensori e Logica di Background
+│   ├── bluetooth_service.dart # Scanner BLE e parser pacchetti Heart Rate
+│   ├── location_service.dart  # Geolocator + Android Foreground Service
+│   ├── tts_service.dart       # Coda FIFO e sintesi vocale FlutterTTS
+│   └── workout_service.dart   # Engine di allenamento, tick timer e regole alert
+└── utils/                # Costanti, palette colori e formule HR (Tanaka)
+```
+
+---
+
+## 🚀 Come Eseguire il Progetto
+
+### Prerequisiti
+* [Flutter SDK](https://flutter.dev/docs/get-started/install) (versione `>= 3.11.4`)
+* [Android Studio](https://developer.android.com/studio) / Android SDK con supporto Android 13+ (API 33+)
+* Dispositivo fisico Android con Bluetooth e GPS abilitati (consigliato per testare BLE e GPS).
+
+### Installazione
+
+1. **Clona la repository:**
+   ```bash
+   git clone https://github.com/RobFalc99/RunVoice.git
+   cd RunVoice
+   ```
+
+2. **Installa le dipendenze:**
+   ```bash
+   flutter pub get
+   ```
+
+3. **Avvia l'app in modalità Debug:**
+   ```bash
+   flutter run
+   ```
+
+4. **Compila l'APK di produzione:**
+   ```bash
+   flutter build apk --release
+   ```
+   L'APK generato sarà disponibile in:
+   `build/app/outputs/flutter-apk/app-release.apk`
+
+---
+
+## 🛡️ Permessi Richiesti su Android
+
+Per garantire il funzionamento ininterrotto durante la corsa:
+* `ACCESS_FINE_LOCATION` & `ACCESS_BACKGROUND_LOCATION`: Per la rilevazione continua della distanza e del passo GPS.
+* `FOREGROUND_SERVICE` & `FOREGROUND_SERVICE_LOCATION`: Per mantenere attivo il tracking anche quando lo smartphone è in tasca con display bloccato.
+* `POST_NOTIFICATIONS`: Obbligatorio su Android 13+ per consentire al servizio Foreground di rimanere attivo.
+* `BLUETOOTH_SCAN` & `BLUETOOTH_CONNECT`: Per l'accoppiamento a fasce cardio e sensori cardiaci BLE.
+* `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`: Per escludere l'app dalle limitazioni aggressive sul consumo energetico.
+
+---
+
+## 📄 Licenza
+
+Distribuito sotto licenza **MIT**. Consulta il file `LICENSE` per ulteriori informazioni.
+
+---
+
+<div align="center">
+  Sviluppato con passione per i runner da <b>Roberto Falcone</b> 🏃‍♂️💨
+</div>
