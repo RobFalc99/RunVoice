@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -7,6 +8,10 @@ import '../models/preset.dart';
 import '../models/alert_config.dart';
 import '../widgets/alert_card.dart';
 import '../widgets/coaching_alert_card.dart';
+import '../widgets/neumorphic_card.dart';
+import '../widgets/neumorphic_segmented_control.dart';
+import '../widgets/neumorphic_dial.dart';
+import '../models/workout_plan.dart';
 import '../utils/constants.dart';
 
 class PresetEditorScreen extends StatefulWidget {
@@ -66,13 +71,21 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Modifica Preset',
+          'Modifica Workout',
           style: TextStyle(
             color: AppColors.textPrimary,
             fontSize: 20,
             fontWeight: FontWeight.w600,
           ),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Esporta / Importa JSON AI',
+            icon: const Icon(Icons.code, color: AppColors.accent),
+            onPressed: () => _showAiJsonDialog(context, presetProvider, preset),
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -112,38 +125,36 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
 
             const SizedBox(height: 28),
 
-            // Mode Selection
+            // Mode Selection (ISO 9241 Ergonomic Segmented Control)
             const Text(
-              'MODALITÀ ALLENAMENTO',
+              'STRUTTURA ALLENAMENTO',
               style: TextStyle(
                 color: AppColors.textMuted,
                 fontSize: 12,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 1,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.2,
               ),
             ),
-            const SizedBox(height: 8),
-            Container(
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: SwitchListTile(
-                title: const Text(
-                  'Modalità Ripetute',
-                  style: TextStyle(color: AppColors.textPrimary),
+            const SizedBox(height: 10),
+            NeumorphicSegmentedControl<bool>(
+              value: preset.isIntervalTraining,
+              minHeight: 52,
+              onChanged: (isIntervals) {
+                preset.isIntervalTraining = isIntervals;
+                presetProvider.updatePreset(preset);
+              },
+              segments: const [
+                NeumorphicSegment<bool>(
+                  value: false,
+                  label: 'Corsa Continua',
+                  icon: Icons.directions_run,
                 ),
-                subtitle: const Text(
-                  'Esegui una sequenza di passi uno dopo l\'altro',
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                NeumorphicSegment<bool>(
+                  value: true,
+                  label: 'Ripetute & Fasi',
+                  icon: Icons.repeat,
                 ),
-                activeTrackColor: AppColors.primary,
-                value: preset.isIntervalTraining,
-                onChanged: (v) {
-                  preset.isIntervalTraining = v;
-                  presetProvider.updatePreset(preset);
-                },
-              ),
+              ],
             ),
 
             const SizedBox(height: 28),
@@ -1054,6 +1065,32 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
                         ),
                       ),
                     ],
+                  ),
+                ] else if (selectedMetric == AlertMetric.pace) ...[
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: NeumorphicDial(
+                        value: (minValue * 60).clamp(180.0, 480.0),
+                        min: 180.0, // 3:00 /km
+                        max: 480.0, // 8:00 /km
+                        step: 5.0,  // ogni 5 secondi
+                        label: 'Ritmo Target',
+                        size: 190,
+                        valueFormatter: (sec) {
+                          final m = sec.toInt() ~/ 60;
+                          final s = sec.toInt() % 60;
+                          return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')} /km';
+                        },
+                        onChanged: (newSec) {
+                          setModalState(() {
+                            minValue = newSec / 60.0;
+                            // Finestra di tolleranza automatica +- 10 secondi
+                            maxValue = (newSec + 10) / 60.0;
+                          });
+                        },
+                      ),
+                    ),
                   ),
                 ] else ...[
                   Row(
@@ -2188,5 +2225,105 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
     CoachingAlert coaching,
   ) {
     _showCoachingDialogInternal(context, provider, presetId, coaching, step: step);
+  }
+
+  void _showAiJsonDialog(BuildContext context, PresetProvider provider, Preset preset) {
+    final workoutPlan = WorkoutPlan.fromPreset(preset);
+    final jsonController = TextEditingController(text: workoutPlan.toPrettyJson());
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          backgroundColor: AppColors.surface,
+          title: const Row(
+            children: [
+              Icon(Icons.auto_awesome, color: AppColors.accent, size: 22),
+              SizedBox(width: 8),
+              Text(
+                'Workout JSON (AI Standard)',
+                style: TextStyle(fontSize: 18, color: AppColors.textPrimary),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Formato standard generato per/da LLM. Puoi modificare il JSON o incollarne uno generato da un\'IA e applicarlo subito.',
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                ),
+                const SizedBox(height: 12),
+                NeumorphicCard(
+                  padding: const EdgeInsets.all(10),
+                  borderRadius: 12,
+                  style: NeumorphicStyle.inset,
+                  child: TextField(
+                    controller: jsonController,
+                    maxLines: 14,
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                      color: AppColors.accentLight,
+                    ),
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      filled: false,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: jsonController.text));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('JSON copiato negli appunti!')),
+                );
+              },
+              child: const Text('Copia'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text('Annulla'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                try {
+                  final decoded = jsonDecode(jsonController.text) as Map<String, dynamic>;
+                  final newPlan = WorkoutPlan.fromJson(decoded);
+                  final convertedPreset = newPlan.toPreset();
+                  preset.name = convertedPreset.name;
+                  preset.description = convertedPreset.description;
+                  preset.isIntervalTraining = convertedPreset.isIntervalTraining;
+                  preset.intervals = convertedPreset.intervals;
+                  preset.announceStart = convertedPreset.announceStart;
+                  preset.announceEnd = convertedPreset.announceEnd;
+                  preset.announceSummary = convertedPreset.announceSummary;
+                  provider.updatePreset(preset);
+                  Navigator.pop(dialogCtx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Workout aggiornato dal JSON!')),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Errore JSON non valido: $e')),
+                  );
+                }
+              },
+              child: const Text('Applica'),
+            ),
+          ],
+        );
+      },
+    );
   }
 }

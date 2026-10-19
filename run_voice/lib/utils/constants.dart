@@ -1,40 +1,45 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  // Primary palette - Deep energetic orange/coral
+  // Primary palette - Hyper Orange / Neon Coral
   static const Color primary = Color(0xFFFF6B35);
   static const Color primaryLight = Color(0xFFFF8F5E);
   static const Color primaryDark = Color(0xFFE54E1B);
 
-  // Accent - Electric cyan
-  static const Color accent = Color(0xFF00E5FF);
-  static const Color accentLight = Color(0xFF6EFFFF);
-  static const Color accentDark = Color(0xFF00B2CC);
+  // Accent - Cyber Cyan
+  static const Color accent = Color(0xFF00F0FF);
+  static const Color accentLight = Color(0xFF70F8FF);
+  static const Color accentDark = Color(0xFF00B4C4);
 
-  // Background - Deep dark
-  static const Color background = Color(0xFF0D1117);
-  static const Color surface = Color(0xFF161B22);
-  static const Color surfaceLight = Color(0xFF21262D);
-  static const Color surfaceHighlight = Color(0xFF30363D);
+  // Dark Neumorphic Base Surfaces
+  static const Color background = Color(0xFF0F1319);
+  static const Color surface = Color(0xFF141922);
+  static const Color surfaceLight = Color(0xFF1B222E);
+  static const Color surfaceHighlight = Color(0xFF242C3B);
+
+  // Neumorphic Shadow System
+  static const Color neuDarkShadow = Color(0xFF090C10);
+  static const Color neuLightShadow = Color(0xFF1F2634);
+  static const Color neuBorder = Color(0xFF232B3A);
 
   // Text
-  static const Color textPrimary = Color(0xFFF0F6FC);
-  static const Color textSecondary = Color(0xFF8B949E);
-  static const Color textMuted = Color(0xFF6E7681);
+  static const Color textPrimary = Color(0xFFF3F6FA);
+  static const Color textSecondary = Color(0xFF94A1B2);
+  static const Color textMuted = Color(0xFF677587);
 
   // Status
-  static const Color success = Color(0xFF3FB950);
-  static const Color warning = Color(0xFFD29922);
-  static const Color error = Color(0xFFF85149);
-  static const Color info = Color(0xFF58A6FF);
+  static const Color success = Color(0xFF00E676);
+  static const Color warning = Color(0xFFFFB300);
+  static const Color error = Color(0xFFFF3D57);
+  static const Color info = Color(0xFF00F0FF);
 
   // HR Zones
-  static const Color zone0 = Color(0xFF6E7681); // Resting - Gray
-  static const Color zone1 = Color(0xFF58A6FF); // Recovery - Blue
-  static const Color zone2 = Color(0xFF3FB950); // Aerobic - Green
-  static const Color zone3 = Color(0xFFD29922); // Tempo - Yellow
+  static const Color zone0 = Color(0xFF677587); // Resting - Gray
+  static const Color zone1 = Color(0xFF00F0FF); // Recovery - Cyan
+  static const Color zone2 = Color(0xFF00E676); // Aerobic - Green
+  static const Color zone3 = Color(0xFFFFB300); // Tempo - Yellow
   static const Color zone4 = Color(0xFFFF6B35); // Threshold - Orange
-  static const Color zone5 = Color(0xFFF85149); // Maximum - Red
+  static const Color zone5 = Color(0xFFFF3D57); // Maximum - Neon Red
 
   static Color getZoneColor(int zone) {
     switch (zone) {
@@ -53,6 +58,59 @@ class AppColors {
       default:
         return textMuted;
     }
+  }
+}
+
+class NeumorphicDecorations {
+  static BoxDecoration extruded({
+    double radius = 16,
+    Color color = AppColors.surface,
+    Color? borderColor,
+    double depth = 4,
+  }) {
+    return BoxDecoration(
+      color: color,
+      borderRadius: BorderRadius.circular(radius),
+      border: Border.all(
+        color: borderColor ?? AppColors.neuBorder.withValues(alpha: 0.5),
+        width: 1,
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: AppColors.neuDarkShadow.withValues(alpha: 0.9),
+          offset: Offset(depth, depth),
+          blurRadius: depth * 2.5,
+        ),
+        BoxShadow(
+          color: AppColors.neuLightShadow.withValues(alpha: 0.6),
+          offset: Offset(-depth * 0.7, -depth * 0.7),
+          blurRadius: depth * 2,
+        ),
+      ],
+    );
+  }
+
+  static BoxDecoration inset({
+    double radius = 16,
+    Color color = AppColors.background,
+    Color? borderColor,
+  }) {
+    return BoxDecoration(
+      color: color,
+      borderRadius: BorderRadius.circular(radius),
+      border: Border.all(
+        color: borderColor ?? AppColors.neuDarkShadow.withValues(alpha: 0.8),
+        width: 1.2,
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: AppColors.neuDarkShadow.withValues(alpha: 0.7),
+          offset: const Offset(2, 2),
+          blurRadius: 4,
+          spreadRadius: -1,
+        ),
+      ],
+    );
   }
 }
 
@@ -77,7 +135,7 @@ class AppTheme {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.surfaceHighlight, width: 1),
+          side: const BorderSide(color: AppColors.neuBorder, width: 1),
         ),
       ),
       appBarTheme: const AppBarTheme(
@@ -87,7 +145,7 @@ class AppTheme {
         centerTitle: false,
         titleTextStyle: TextStyle(
           color: AppColors.textPrimary,
-          fontSize: 24,
+          fontSize: 22,
           fontWeight: FontWeight.w700,
           letterSpacing: -0.5,
         ),
@@ -129,20 +187,20 @@ class AppTheme {
         filled: true,
         fillColor: AppColors.surfaceLight,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.surfaceHighlight),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.neuBorder),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.surfaceHighlight),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.neuBorder),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.primary, width: 2),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.accent, width: 2),
         ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
-          vertical: 14,
+          vertical: 16,
         ),
         labelStyle: const TextStyle(color: AppColors.textSecondary),
         hintStyle: const TextStyle(color: AppColors.textMuted),
@@ -174,7 +232,7 @@ class AppTheme {
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
-        elevation: 4,
+        elevation: 6,
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: AppColors.surface,

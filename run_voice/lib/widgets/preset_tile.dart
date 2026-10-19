@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/preset.dart';
 import '../utils/constants.dart';
+import 'neumorphic_card.dart';
 
 class PresetTile extends StatelessWidget {
   final Preset preset;
@@ -22,30 +23,20 @@ class PresetTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: isSelected
-            ? AppColors.primary.withValues(alpha: 0.08)
-            : AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isSelected
-              ? AppColors.primary.withValues(alpha: 0.5)
-              : AppColors.surfaceHighlight,
-          width: isSelected ? 2 : 1,
-        ),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+    return NeumorphicCard(
+      margin: const EdgeInsets.only(bottom: 14),
+      borderRadius: 18,
+      backgroundColor: isSelected
+          ? AppColors.surfaceLight
+          : AppColors.surface,
+      accentBorderColor: isSelected
+          ? AppColors.primary
+          : AppColors.neuBorder.withValues(alpha: 0.7),
+      onTap: onTap,
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
                 Row(
                   children: [
                     // Selected indicator
@@ -187,9 +178,6 @@ class PresetTile extends StatelessWidget {
                 ),
               ],
             ),
-          ),
-        ),
-      ),
     );
   }
 }

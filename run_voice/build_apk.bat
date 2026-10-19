@@ -6,7 +6,7 @@ echo ===================================================
 echo.
 
 :: Si sposta sul disco C e nella cartella corretta
-cd /d "C:\Users\rf199\Progetti\[04] RunVoice\run_voice"
+cd /d "C:\Users\rf199\Progetti\[99] ARCHIVIO\[03] RunVoice\run_voice"
 
 :: Esegue la compilazione nativa di Flutter
 call flutter build apk --release
