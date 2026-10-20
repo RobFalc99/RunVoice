@@ -3,8 +3,73 @@ import 'package:http/http.dart' as http;
 import '../models/workout_plan.dart';
 
 class GeminiService {
-  static const String defaultModel = 'gemini-2.5-flash';
+  static const String defaultModel = 'gemini-3.5-flash-lite';
   static const String _baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models';
+  static const List<({String id, String label, String badge, String description})> curatedModels = [
+    (
+      id: 'gemini-3.5-flash-lite',
+      label: 'Gemini 3.5 Flash-Lite',
+      badge: 'Consigliato ⚡',
+      description: 'Ultraleggero, bassissima latenza e consumo ridotto',
+    ),
+    (
+      id: 'gemini-3.8-flash',
+      label: 'Gemini 3.8 Flash',
+      badge: 'Novità 2026 🚀',
+      description: 'Ultimo modello Flash raccomandato da Google AI Studio',
+    ),
+    (
+      id: 'gemini-3.5-flash',
+      label: 'Gemini 3.5 Flash',
+      badge: 'Bilanciato 🎯',
+      description: 'Ottimo bilanciamento tra ragionamento e velocità',
+    ),
+    (
+      id: 'gemini-flash-latest',
+      label: 'Gemini Flash Latest',
+      badge: 'Auto-Update 🔄',
+      description: 'Punta sempre all\'ultima versione stabile rilasciata',
+    ),
+    (
+      id: 'gemini-flash-lite-latest',
+      label: 'Gemini Flash-Lite Latest',
+      badge: 'Auto-Update Lite 🔄',
+      description: 'Punta sempre alla versione Flash-Lite più recente',
+    ),
+    (
+      id: 'gemini-2.5-flash',
+      label: 'Gemini 2.5 Flash',
+      badge: 'Legacy 📦',
+      description: 'Versione precedente (potrebbe non essere attiva su tutti gli account)',
+    ),
+  ];
+
+  /// Queries the /v1beta/models endpoint with the provided API key and returns list of model IDs supporting generateContent.
+  static Future<List<String>> fetchAvailableModels(String apiKey) async {
+    if (apiKey.trim().isEmpty) return [];
+    try {
+      final url = Uri.parse('$_baseUrl?key=${apiKey.trim()}');
+      final response = await http.get(url).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final models = data['models'] as List<dynamic>? ?? [];
+        final result = <String>[];
+        for (final m in models) {
+          if (m is Map<String, dynamic>) {
+            final methods = (m['supportedGenerationMethods'] as List<dynamic>?)?.cast<String>() ?? [];
+            if (methods.contains('generateContent')) {
+              final name = (m['name'] as String? ?? '').replaceFirst('models/', '');
+              if (name.isNotEmpty) {
+                result.add(name);
+              }
+            }
+          }
+        }
+        return result;
+      }
+    } catch (_) {}
+    return [];
+  }
 
   /// Tests if the provided API key is valid by sending a minimal ping request.
   static Future<({bool success, String message})> testApiKey(

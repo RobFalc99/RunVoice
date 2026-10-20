@@ -22,6 +22,9 @@ class UserProvider extends ChangeNotifier {
         _profile.geminiApiKey = compileKey;
       }
     }
+    if (_profile.geminiModel.isEmpty || _profile.geminiModel == 'gemini-2.5-flash') {
+      _profile.geminiModel = 'gemini-3.5-flash-lite';
+    }
     // Initialize zones if empty
     // Initialize zones if empty and maxHR is set
     if (_profile.hrZones.isEmpty && _profile.maxHeartRate > 0) {
@@ -85,6 +88,11 @@ class UserProvider extends ChangeNotifier {
 
   void updateGeminiApiKey(String key) {
     _profile.geminiApiKey = key.trim();
+    saveProfile();
+  }
+
+  void updateGeminiModel(String model) {
+    _profile.geminiModel = model;
     saveProfile();
   }
 

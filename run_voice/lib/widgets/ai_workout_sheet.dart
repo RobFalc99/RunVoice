@@ -84,7 +84,13 @@ class _AiWorkoutSheetState extends State<AiWorkoutSheet> {
     });
 
     try {
-      final plan = await GeminiService.generateWorkoutPlan(apiKey, text);
+      final userProvider = context.read<UserProvider>();
+      final model = userProvider.profile.geminiModel;
+      final plan = await GeminiService.generateWorkoutPlan(
+        apiKey,
+        text,
+        model: model,
+      );
       if (!mounted) return;
       setState(() {
         _isLoading = false;
@@ -176,7 +182,7 @@ class _AiWorkoutSheetState extends State<AiWorkoutSheet> {
                             ),
                           ),
                           Text(
-                            'Powered by Gemini 2.5 Flash',
+                            'Powered by ${userProvider.profile.geminiModelLabel}',
                             style: TextStyle(
                               color: AppColors.primary.withValues(alpha: 0.8),
                               fontSize: 12,

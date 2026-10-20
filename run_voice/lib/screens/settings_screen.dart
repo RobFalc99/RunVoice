@@ -29,6 +29,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _isTestingApiKey = false;
   String? _apiKeyTestMessage;
   bool? _apiKeyTestSuccess;
+  bool _isDetectingModels = false;
+  List<String> _detectedModelIds = [];
 
   @override
   void dispose() {
@@ -606,6 +608,133 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           ),
           const SizedBox(height: 16),
+
+          // --- Model Selector Section ---
+          const Text(
+            'Modello AI',
+            style: TextStyle(
+              color: AppColors.textMuted,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 1,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.surfaceHighlight),
+            ),
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header with Detect button
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Modello Selezionato',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    TextButton.icon(
+                      icon: _isDetectingModels
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  AppColors.primary,
+                                ),
+                              ),
+                            )
+                          : const Icon(Icons.refresh, size: 16),
+                      label: const Text('🔄 Rileva'),
+                      onPressed: _isDetectingModels
+                          ? null
+                          : () async {
+                              final apiKey =
+                                  _geminiApiKeyController.text.trim();
+                              if (apiKey.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Per rilevare i modelli, inserisci prima la chiave API.',
+                                    ),
+                                    duration: Duration(seconds: 2),
+                                  ),
+                                );
+                                return;
+                              }
+                              setState(() => _isDetectingModels = true);
+                              try {
+                                final detected =
+                                    await GeminiService.fetchAvailableModels(
+                                  apiKey,
+                                );
+                                if (!mounted) return;
+                                setState(
+                                  () {
+                                    _detectedModelIds = detected;
+                                    _isDetectingModels = false;
+                                  },
+                                );
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Rilevati ${detected.length} modelli attivi per la tua chiave.',
+                                    ),
+                                    duration: const Duration(seconds: 2),
+                                  ),
+                                );
+                              } catch (e) {
+                                if (!mounted) return;
+                                setState(() => _isDetectingModels = false);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Errore nel rilevamento: ${e.toString()}',
+                                    ),
+                                    duration: const Duration(seconds: 3),
+                                  ),
+                                );
+                              }
+                            },
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Dropdown for model selection
+                DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _getValidModelValue(userProvider.profile.geminiModel),
+                    dropdownColor: AppColors.surface,
+                    isExpanded: true,
+                    items: _buildModelDropdownItems(),
+                    onChanged: (newModel) {
+                      if (newModel != null) {
+                        userProvider.updateGeminiModel(newModel);
+                        setState(() {});
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // --- API Key TextField ---
           TextField(
             controller: _geminiApiKeyController,
             obscureText: _obscureApiKey,
@@ -695,12 +824,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ? null
                   : () async {
                       final key = _geminiApiKeyController.text.trim();
+                      final model = userProvider.profile.geminiModel;
                       userProvider.updateGeminiApiKey(key);
                       setState(() {
                         _isTestingApiKey = true;
                         _apiKeyTestMessage = null;
                       });
-                      final res = await GeminiService.testApiKey(key);
+                      final res = await GeminiService.testApiKey(
+                        key,
+                        model: model,
+                      );
                       if (!mounted) return;
                       setState(() {
                         _isTestingApiKey = false;
@@ -721,7 +854,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               label: Text(
                 _isTestingApiKey
                     ? 'Verifica connessione...'
-                    : 'Salva e Verifica Connessione',
+                    : 'Testa Connessione (${userProvider.profile.geminiModelLabel})',
               ),
             ),
           ),
@@ -748,6 +881,114 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  /// Build dropdown items combining curated models and detected models
+  List<DropdownMenuItem<String>> _buildModelDropdownItems() {
+    final curatedModels = GeminiService.curatedModels;
+    final items = <DropdownMenuItem<String>>[];
+
+    // Add curated models
+    for (final model in curatedModels) {
+      items.add(
+        DropdownMenuItem<String>(
+          value: model.id,
+          child: _buildModelDropdownItem(
+            model.id,
+            model.label,
+            model.badge,
+            model.description,
+          ),
+        ),
+      );
+    }
+
+    // Add detected models that are not in curated list
+    final curatedIds = curatedModels.map((m) => m.id).toSet();
+    for (final detectedId in _detectedModelIds) {
+      if (!curatedIds.contains(detectedId)) {
+        items.add(
+          DropdownMenuItem<String>(
+            value: detectedId,
+            child: _buildModelDropdownItem(
+              detectedId,
+              detectedId,
+              'Custom ⚙️',
+              'Modello personalizzato rilevato',
+            ),
+          ),
+        );
+      }
+    }
+
+    return items;
+  }
+
+  /// Build individual dropdown item widget
+  Widget _buildModelDropdownItem(
+    String id,
+    String label,
+    String badge,
+    String description,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                badge,
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          description,
+          style: const TextStyle(
+            color: AppColors.textMuted,
+            fontSize: 11,
+          ),
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+  }
+
+  /// Ensures the dropdown value is valid, fallback to defaultModel if not found
+  String _getValidModelValue(String currentModel) {
+    final curatedIds =
+        GeminiService.curatedModels.map((m) => m.id).toSet();
+    if (curatedIds.contains(currentModel) ||
+        _detectedModelIds.contains(currentModel)) {
+      return currentModel;
+    }
+    return GeminiService.defaultModel;
   }
 
   void _showBluetoothDialog(BluetoothProvider btProvider) {

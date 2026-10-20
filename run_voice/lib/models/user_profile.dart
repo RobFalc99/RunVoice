@@ -11,6 +11,7 @@ class UserProfile {
   String selectedVoice;
   String? connectedSensorId;
   String? connectedSensorName;
+  String geminiModel;
   // Voice settings
   double speechRate;
   bool speakUnits; // Whether to speak unit names
@@ -27,6 +28,7 @@ class UserProfile {
     this.selectedVoice = '',
     this.connectedSensorId,
     this.connectedSensorName,
+    this.geminiModel = 'gemini-3.5-flash-lite',
     this.speechRate = 1.0,
     this.speakUnits = true,
     this.speakName = true,
@@ -50,6 +52,7 @@ class UserProfile {
     'selectedVoice': selectedVoice,
     'connectedSensorId': connectedSensorId,
     'connectedSensorName': connectedSensorName,
+    'geminiModel': geminiModel,
     'speechRate': speechRate,
     'speakUnits': speakUnits,
     'speakName': speakName,
@@ -71,9 +74,20 @@ class UserProfile {
     selectedVoice: json['selectedVoice'] as String? ?? '',
     connectedSensorId: json['connectedSensorId'] as String?,
     connectedSensorName: json['connectedSensorName'] as String?,
+    geminiModel: json['geminiModel'] as String? ?? 'gemini-3.5-flash-lite',
     speechRate: (json['speechRate'] as num?)?.toDouble() ?? 1.0,
     speakUnits: json['speakUnits'] as bool? ?? true,
     speakName: json['speakName'] as bool? ?? true,
     geminiApiKey: json['geminiApiKey'] as String? ?? '',
   );
+
+  String get geminiModelLabel {
+    if (geminiModel == 'gemini-3.5-flash-lite') return 'Gemini 3.5 Flash-Lite';
+    if (geminiModel == 'gemini-3.8-flash') return 'Gemini 3.8 Flash';
+    if (geminiModel == 'gemini-3.5-flash') return 'Gemini 3.5 Flash';
+    if (geminiModel == 'gemini-flash-latest') return 'Gemini Flash Latest';
+    if (geminiModel == 'gemini-flash-lite-latest') return 'Gemini Flash-Lite Latest';
+    if (geminiModel == 'gemini-2.5-flash') return 'Gemini 2.5 Flash';
+    return geminiModel;
+  }
 }

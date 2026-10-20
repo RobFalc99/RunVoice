@@ -20,6 +20,34 @@ void main() {
     });
   });
 
+  group('UserProfile Gemini Model', () {
+    test('default geminiModel is gemini-3.5-flash-lite', () {
+      final profile = UserProfile();
+      expect(profile.geminiModel, equals('gemini-3.5-flash-lite'));
+    });
+
+    test('geminiModelLabel returns correct label for gemini-3.5-flash-lite', () {
+      final profile = UserProfile();
+      profile.geminiModel = 'gemini-3.5-flash-lite';
+      expect(profile.geminiModelLabel, equals('Gemini 3.5 Flash-Lite'));
+    });
+
+    test('geminiModelLabel returns correct label for gemini-3.8-flash', () {
+      final profile = UserProfile();
+      profile.geminiModel = 'gemini-3.8-flash';
+      expect(profile.geminiModelLabel, equals('Gemini 3.8 Flash'));
+    });
+
+    test('serializes and deserializes geminiModel correctly', () {
+      final profile = UserProfile();
+      profile.geminiModel = 'gemini-3.8-flash';
+      final jsonString = profile.toJsonString();
+      final restored = UserProfile.fromJsonString(jsonString);
+      expect(restored.geminiModel, equals('gemini-3.8-flash'));
+      expect(restored.geminiModelLabel, equals('Gemini 3.8 Flash'));
+    });
+  });
+
   group('GeminiService Validation', () {
     test('empty key returns success: false', () async {
       final res = await GeminiService.testApiKey('');
@@ -31,6 +59,36 @@ void main() {
       final res = await GeminiService.testApiKey('   ');
       expect(res.success, isFalse);
       expect(res.message, contains('vuota'));
+    });
+  });
+
+  group('GeminiService Curated Models', () {
+    test('curatedModels contains gemini-3.5-flash-lite', () {
+      expect(
+        GeminiService.curatedModels.any((m) => m.id == 'gemini-3.5-flash-lite'),
+        isTrue,
+      );
+    });
+
+    test('curatedModels contains gemini-3.8-flash', () {
+      expect(
+        GeminiService.curatedModels.any((m) => m.id == 'gemini-3.8-flash'),
+        isTrue,
+      );
+    });
+
+    test('gemini-3.5-flash-lite model has correct metadata', () {
+      final model = GeminiService.curatedModels
+          .firstWhere((m) => m.id == 'gemini-3.5-flash-lite');
+      expect(model.label, equals('Gemini 3.5 Flash-Lite'));
+      expect(model.badge, contains('Consigliato'));
+    });
+
+    test('gemini-3.8-flash model has correct metadata', () {
+      final model =
+          GeminiService.curatedModels.firstWhere((m) => m.id == 'gemini-3.8-flash');
+      expect(model.label, equals('Gemini 3.8 Flash'));
+      expect(model.badge, contains('Novità'));
     });
   });
 

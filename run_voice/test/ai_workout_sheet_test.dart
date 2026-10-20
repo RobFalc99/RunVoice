@@ -26,7 +26,30 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Workout Rapido con AI'), findsOneWidget);
-    expect(find.text('Powered by Gemini 2.5 Flash'), findsOneWidget);
+    expect(find.text('Powered by Gemini 3.5 Flash-Lite'), findsOneWidget);
+  });
+
+  testWidgets('AiWorkoutSheet displays correct model label for gemini-3.8-flash', (tester) async {
+    final userProvider = UserProvider();
+    userProvider.profile.geminiModel = 'gemini-3.8-flash';
+    final presetProvider = PresetProvider();
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: userProvider),
+          ChangeNotifierProvider.value(value: presetProvider),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(
+            body: AiWorkoutSheet(onTheFly: true),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Powered by Gemini 3.8 Flash'), findsOneWidget);
   });
 
   testWidgets('AiWorkoutSheet renders correctly in presets mode', (tester) async {
