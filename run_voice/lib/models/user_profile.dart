@@ -15,6 +15,7 @@ class UserProfile {
   double speechRate;
   bool speakUnits; // Whether to speak unit names
   bool speakName; // Whether to announce the name
+  String geminiApiKey;
 
   UserProfile({
     this.firstName = '',
@@ -29,6 +30,7 @@ class UserProfile {
     this.speechRate = 1.0,
     this.speakUnits = true,
     this.speakName = true,
+    this.geminiApiKey = '',
   }) : hrZones = hrZones ?? [];
 
   String get displayName {
@@ -51,6 +53,7 @@ class UserProfile {
     'speechRate': speechRate,
     'speakUnits': speakUnits,
     'speakName': speakName,
+    'geminiApiKey': geminiApiKey,
   };
 
   factory UserProfile.fromJsonString(String jsonString) =>
@@ -71,5 +74,6 @@ class UserProfile {
     speechRate: (json['speechRate'] as num?)?.toDouble() ?? 1.0,
     speakUnits: json['speakUnits'] as bool? ?? true,
     speakName: json['speakName'] as bool? ?? true,
+    geminiApiKey: json['geminiApiKey'] as String? ?? '',
   );
 }

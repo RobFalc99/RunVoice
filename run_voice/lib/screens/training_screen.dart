@@ -8,8 +8,18 @@ import '../providers/user_provider.dart';
 import '../widgets/sensor_status_card.dart';
 import '../widgets/metric_display.dart';
 import '../widgets/bluetooth_device_dialog.dart';
+import '../widgets/ai_workout_sheet.dart';
 import '../models/alert_config.dart';
 import '../utils/constants.dart';
+
+String _formatPace(double paceMinPerKm) {
+  if (paceMinPerKm <= 0 || paceMinPerKm.isInfinite || paceMinPerKm.isNaN) {
+    return '--:--';
+  }
+  final minutes = paceMinPerKm.floor();
+  final seconds = ((paceMinPerKm - minutes) * 60).round();
+  return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+}
 
 class TrainingScreen extends StatefulWidget {
   const TrainingScreen({super.key});
@@ -48,15 +58,6 @@ class _TrainingScreenState extends State<TrainingScreen>
     if (hours > 0) {
       return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
     }
-    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-  }
-
-  String _formatPace(double paceMinPerKm) {
-    if (paceMinPerKm <= 0 || paceMinPerKm.isInfinite || paceMinPerKm.isNaN) {
-      return '--:--';
-    }
-    final minutes = paceMinPerKm.floor();
-    final seconds = ((paceMinPerKm - minutes) * 60).round();
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
@@ -167,6 +168,80 @@ class _TrainingScreenState extends State<TrainingScreen>
                         onTap: () => _showBluetoothDialog(bluetoothProvider),
                       ),
                     ],
+                  ),
+                ),
+              ),
+
+              // On The Fly AI Workout Card
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.35),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.auto_awesome,
+                            color: AppColors.primary,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Workout Rapido con AI',
+                                style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                'Descrivi la corsa e parti al volo',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        ElevatedButton(
+                          onPressed: () => AiWorkoutSheet.show(
+                            context,
+                            onTheFly: true,
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 8,
+                            ),
+                            minimumSize: Size.zero,
+                          ),
+                          child: const Text(
+                            'Al Volo 🚀',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -832,15 +907,6 @@ class _PaceSlidableBox extends StatefulWidget {
 
 class _PaceSlidableBoxState extends State<_PaceSlidableBox> {
   final PageController _controller = PageController();
-
-  String _formatPace(double paceMinPerKm) {
-    if (paceMinPerKm <= 0 || paceMinPerKm.isInfinite || paceMinPerKm.isNaN) {
-      return '--:--';
-    }
-    final minutes = paceMinPerKm.floor();
-    final seconds = ((paceMinPerKm - minutes) * 60).round();
-    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-  }
 
   @override
   void dispose() {

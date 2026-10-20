@@ -3,8 +3,26 @@ import 'package:provider/provider.dart';
 import '../providers/bluetooth_provider.dart';
 import '../utils/constants.dart';
 
-class BluetoothDeviceDialog extends StatelessWidget {
+class BluetoothDeviceDialog extends StatefulWidget {
   const BluetoothDeviceDialog({super.key});
+
+  @override
+  State<BluetoothDeviceDialog> createState() => _BluetoothDeviceDialogState();
+}
+
+class _BluetoothDeviceDialogState extends State<BluetoothDeviceDialog> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final bt = context.read<BluetoothProvider>();
+        if (!bt.isConnected && !bt.isScanning) {
+          bt.startScan();
+        }
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -96,32 +114,45 @@ class BluetoothDeviceDialog extends StatelessWidget {
                   ),
                 ),
               ] else ...[
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton.icon(
-                    onPressed: btProvider.isScanning
-                        ? null
-                        : () async {
-                            await btProvider.startScan();
-                          },
-                    icon: btProvider.isScanning
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
+                if (btProvider.isScanning)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceHighlight.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.18),
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Ricerca sensori Bluetooth in corso...',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
                             ),
-                          )
-                        : const Icon(Icons.bluetooth_searching),
-                    label: Text(
-                      btProvider.isScanning
-                          ? 'Ricerca in corso...'
-                          : 'Cerca sensori',
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
                 const SizedBox(height: 16),
 
                 if (btProvider.scanResults.isNotEmpty)
@@ -169,16 +200,32 @@ class BluetoothDeviceDialog extends StatelessWidget {
                   )
                 else if (!btProvider.isScanning)
                   Container(
-                    padding: const EdgeInsets.all(24),
-                    child: const Center(
-                      child: Text(
-                        'Nessun sensore trovato.\nPremi "Cerca sensori" per iniziare.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: AppColors.textMuted,
-                          fontSize: 14,
-                        ),
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceHighlight.withValues(alpha: 0.25),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: AppColors.surfaceHighlight.withValues(alpha: 0.5),
                       ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Nessun sensore trovato nelle vicinanze.',
+                          style: TextStyle(
+                            color: AppColors.textMuted,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextButton.icon(
+                          onPressed: () => btProvider.startScan(),
+                          icon: const Icon(Icons.refresh, size: 16),
+                          label: const Text('Riprova scansione'),
+                        ),
+                      ],
                     ),
                   ),
               ],

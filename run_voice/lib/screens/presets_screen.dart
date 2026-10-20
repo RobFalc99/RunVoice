@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/preset_provider.dart';
 import '../models/preset.dart';
 import '../widgets/preset_tile.dart';
+import '../widgets/ai_workout_sheet.dart';
 import '../utils/constants.dart';
 import 'preset_editor_screen.dart';
 
@@ -24,7 +25,7 @@ class PresetsScreen extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
                 child: Row(
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -38,6 +39,19 @@ class PresetsScreen extends StatelessWidget {
                             ),
                           ),
                           SizedBox(height: 4),
+                    TextButton.icon(
+                      icon: const Icon(Icons.auto_awesome,
+                          size: 18, color: AppColors.primary),
+                      label: const Text(
+                        'Crea con AI',
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      onPressed: () =>
+                          AiWorkoutSheet.show(context, onTheFly: false),
+                    ),
                           Text(
                             'Configura i tuoi avvisi personalizzati',
                             style: TextStyle(
@@ -163,6 +177,14 @@ class PresetsScreen extends StatelessWidget {
           ],
         ),
         actions: [
+          TextButton.icon(
+            icon: const Icon(Icons.auto_awesome, size: 16),
+            label: const Text('Genera con AI'),
+            onPressed: () {
+              Navigator.pop(ctx);
+              AiWorkoutSheet.show(context, onTheFly: false);
+            },
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Annulla'),

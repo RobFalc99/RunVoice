@@ -305,9 +305,7 @@ class WorkoutPlan {
 
     for (final step in steps) {
       final stepTotal = step.totalDuration;
-      if (dType == null) {
-        dType = stepTotal.type;
-      }
+      dType ??= stepTotal.type;
       if (stepTotal.type == dType) {
         totalValue += stepTotal.value;
       }

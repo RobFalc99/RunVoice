@@ -1,0 +1,5 @@
+# Artifacts & Droid tasks
+.tasks/
+*.apk
+.env
+*.env

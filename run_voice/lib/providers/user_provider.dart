@@ -15,6 +15,13 @@ class UserProvider extends ChangeNotifier {
     if (jsonString != null) {
       _profile = UserProfile.fromJsonString(jsonString);
     }
+    // Load Gemini API key from environment if not already set
+    if (_profile.geminiApiKey.isEmpty) {
+      const compileKey = String.fromEnvironment('GEMINI_API_KEY');
+      if (compileKey.isNotEmpty) {
+        _profile.geminiApiKey = compileKey;
+      }
+    }
     // Initialize zones if empty
     // Initialize zones if empty and maxHR is set
     if (_profile.hrZones.isEmpty && _profile.maxHeartRate > 0) {
@@ -73,6 +80,11 @@ class UserProvider extends ChangeNotifier {
 
   void updateSpeakName(bool value) {
     _profile.speakName = value;
+    saveProfile();
+  }
+
+  void updateGeminiApiKey(String key) {
+    _profile.geminiApiKey = key.trim();
     saveProfile();
   }
 

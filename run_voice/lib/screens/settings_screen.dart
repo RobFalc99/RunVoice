@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/user_provider.dart';
 import '../providers/bluetooth_provider.dart';
 import '../providers/location_provider.dart';
 import '../providers/tts_provider.dart';
+import '../services/gemini_service.dart';
 import '../widgets/zone_editor.dart';
 import '../widgets/sensor_status_card.dart';
 import '../widgets/bluetooth_device_dialog.dart';
@@ -21,7 +23,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late TextEditingController _lastNameController;
   late TextEditingController _ageController;
   late TextEditingController _maxHRController;
+  late TextEditingController _geminiApiKeyController;
   bool _initialized = false;
+  bool _obscureApiKey = true;
+  bool _isTestingApiKey = false;
+  String? _apiKeyTestMessage;
+  bool? _apiKeyTestSuccess;
 
   @override
   void dispose() {
@@ -29,6 +36,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _lastNameController.dispose();
     _ageController.dispose();
     _maxHRController.dispose();
+    _geminiApiKeyController.dispose();
     super.dispose();
   }
 
@@ -45,6 +53,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
       _maxHRController = TextEditingController(
         text: userProvider.profile.maxHeartRate.toString(),
+      );
+      _geminiApiKeyController = TextEditingController(
+        text: userProvider.profile.geminiApiKey,
       );
       _initialized = true;
     }
@@ -109,6 +120,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _sectionTitle('VOCE'),
                     const SizedBox(height: 12),
                     _buildVoiceSection(ttsProvider, userProvider),
+
+                    // --- AI ASSISTANT SECTION ---
+                    const SizedBox(height: 28),
+                    _sectionTitle('ASSISTENTE AI (GEMINI)'),
+                    const SizedBox(height: 12),
+                    _buildAiSection(userProvider),
 
                     const SizedBox(height: 80),
                   ],
@@ -539,6 +556,193 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   'Ciao! Sono la tua assistente vocale per la corsa.',
                 );
               },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAiSection(UserProvider userProvider) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.surfaceHighlight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.auto_awesome,
+                color: AppColors.primary,
+                size: 22,
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    'Google Gemini AI',
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Generazione automatica allenamenti da linguaggio naturale',
+                    style: TextStyle(
+                      color: AppColors.textMuted,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _geminiApiKeyController,
+            obscureText: _obscureApiKey,
+            style: const TextStyle(color: AppColors.textPrimary),
+            decoration: InputDecoration(
+              labelText: 'Google Gemini API Key',
+              hintText: 'Incolla la tua API Key',
+              suffixIcon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      _obscureApiKey
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                    ),
+                    onPressed: () => setState(
+                      () => _obscureApiKey = !_obscureApiKey,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.content_paste),
+                    onPressed: () async {
+                      final data = await Clipboard.getData(Clipboard.kTextPlain);
+                      if (data?.text != null) {
+                        final key = data!.text!.trim();
+                        _geminiApiKeyController.text = key;
+                        userProvider.updateGeminiApiKey(key);
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+            onChanged: (v) => userProvider.updateGeminiApiKey(v.trim()),
+          ),
+          if (_apiKeyTestMessage != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: (_apiKeyTestSuccess ?? false)
+                    ? Colors.green.withValues(alpha: 0.14)
+                    : Colors.red.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: (_apiKeyTestSuccess ?? false)
+                      ? Colors.green.withValues(alpha: 0.35)
+                      : Colors.red.withValues(alpha: 0.35),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    (_apiKeyTestSuccess ?? false)
+                        ? Icons.check_circle
+                        : Icons.error_outline,
+                    color: (_apiKeyTestSuccess ?? false)
+                        ? Colors.green
+                        : Colors.red,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _apiKeyTestMessage!,
+                      style: TextStyle(
+                        color: (_apiKeyTestSuccess ?? false)
+                            ? Colors.green
+                            : Colors.red,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: _isTestingApiKey
+                  ? null
+                  : () async {
+                      final key = _geminiApiKeyController.text.trim();
+                      userProvider.updateGeminiApiKey(key);
+                      setState(() {
+                        _isTestingApiKey = true;
+                        _apiKeyTestMessage = null;
+                      });
+                      final res = await GeminiService.testApiKey(key);
+                      if (!mounted) return;
+                      setState(() {
+                        _isTestingApiKey = false;
+                        _apiKeyTestSuccess = res.success;
+                        _apiKeyTestMessage = res.message;
+                      });
+                    },
+              icon: _isTestingApiKey
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.check_circle_outline),
+              label: Text(
+                _isTestingApiKey
+                    ? 'Verifica connessione...'
+                    : 'Salva e Verifica Connessione',
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.info.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.info.withValues(alpha: 0.25),
+              ),
+            ),
+            child: const Text(
+              'Gemini 2.5 Flash è perfetto per la generazione di allenamenti: è disponibile gratuitamente tramite Google AI Studio (15 RPM / 1.500 RPD), ideale per 3-4 richieste al giorno.\n\nOttieni la tua chiave gratuita su aistudio.google.com/apikey',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+                height: 1.35,
+              ),
             ),
           ),
         ],

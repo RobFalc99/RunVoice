@@ -107,6 +107,12 @@ class PresetProvider extends ChangeNotifier {
     return preset;
   }
 
+  Future<void> addPreset(Preset preset) async {
+    _presets.add(preset);
+    await _save();
+    notifyListeners();
+  }
+
   Future<void> updatePreset(Preset preset) async {
     final index = _presets.indexWhere((p) => p.id == preset.id);
     if (index != -1) {

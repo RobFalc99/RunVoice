@@ -11,6 +11,7 @@ import '../widgets/neumorphic_card.dart';
 import '../widgets/neumorphic_segmented_control.dart';
 import '../widgets/neumorphic_switch.dart';
 import '../widgets/alert_setup_sheet.dart';
+import '../widgets/ai_workout_sheet.dart';
 import '../models/workout_plan.dart';
 import '../utils/constants.dart';
 
@@ -78,6 +79,32 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
           ),
         ),
         actions: [
+          IconButton(
+            tooltip: 'Genera o Rigenera con AI',
+            icon: const Icon(Icons.auto_awesome, color: AppColors.primary),
+            onPressed: () => AiWorkoutSheet.show(
+              context,
+              onTheFly: false,
+              onApplyToEditor: (newPreset) async {
+                preset.name = newPreset.name;
+                preset.description = newPreset.description;
+                preset.intervals = newPreset.intervals;
+                preset.alerts = newPreset.alerts;
+                preset.coachingAlerts = newPreset.coachingAlerts;
+                preset.isIntervalTraining = newPreset.isIntervalTraining;
+                await presetProvider.updatePreset(preset);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Allenamento rigenerato con successo con AI! ⚡',
+                      ),
+                    ),
+                  );
+                }
+              },
+            ),
+          ),
           IconButton(
             tooltip: 'Esporta / Importa JSON AI',
             icon: const Icon(Icons.code, color: AppColors.accent),
@@ -366,7 +393,420 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
     PresetProvider provider,
     Preset preset,
   ) {
-    return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'SEQUENZA RIPETUTE',
+                style: TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1,
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: AppColors.surfaceHighlight),
+              ),
+              child: Text(
+                '${preset.intervals.length} fasi',
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            TextButton.icon(
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Aggiungi Passo'),
+              onPressed: () => _showIntervalStepSheet(
+                context,
+                provider,
+                preset.id,
+                null,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (preset.intervals.isEmpty)
+          _buildEmptyState(
+            'Nessuna fase configurata. Aggiungi il riscaldamento o la prima ripetuta.',
+            () => _showIntervalStepSheet(
+              context,
+              provider,
+              preset.id,
+              null,
+            ),
+          )
+        else
+          ...List.generate(
+            preset.intervals.length,
+            (index) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildIntervalStepCard(
+                context,
+                provider,
+                preset.id,
+                preset.intervals[index],
+                index,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildIntervalStepCard(
+    BuildContext context,
+    PresetProvider provider,
+    String presetId,
+    IntervalStep step,
+    int index,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.surfaceHighlight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 12,
+                backgroundColor: AppColors.primary,
+                child: Text(
+                  '${index + 1}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Colors.black,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  step.name,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.copy, size: 18, color: AppColors.textMuted),
+                onPressed: () => provider.duplicateIntervalInPreset(presetId, step),
+              ),
+              IconButton(
+                icon: const Icon(Icons.edit, size: 18, color: AppColors.primary),
+                onPressed: () => _showIntervalStepSheet(
+                  context,
+                  provider,
+                  presetId,
+                  step,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.error),
+                onPressed: () => provider.removeIntervalFromPreset(presetId, step.id),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Icon(
+                step.type == AlertTrigger.time ? Icons.timer : Icons.straighten,
+                size: 16,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'Durata: ${step.displayDuration}',
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const Divider(color: AppColors.surfaceHighlight, height: 20),
+          Row(
+            children: [
+              const Text(
+                'AVVISI DI QUESTA FASE',
+                style: TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1,
+                ),
+              ),
+              const Spacer(),
+              TextButton.icon(
+                icon: const Icon(Icons.add, size: 13, color: AppColors.primary),
+                label: const Text(
+                  'Periodico',
+                  style: TextStyle(fontSize: 12, color: AppColors.primary),
+                ),
+                onPressed: () => AlertSetupSheet.show(
+                  context,
+                  onConfirm: (result) {
+                    if (result.periodic != null) {
+                      step.alerts.add(result.periodic!);
+                      provider.updateIntervalInPreset(presetId, step);
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              TextButton.icon(
+                icon: const Icon(Icons.add, size: 13, color: AppColors.accent),
+                label: const Text(
+                  'Coaching',
+                  style: TextStyle(fontSize: 12, color: AppColors.accent),
+                ),
+                onPressed: () => AlertSetupSheet.show(
+                  context,
+                  initialCoaching: CoachingAlert(
+                    id: DateTime.now().millisecondsSinceEpoch.toString(),
+                    name: 'Coaching Ritmo',
+                    metric: AlertMetric.pace,
+                    minValue: 5.0,
+                    maxValue: 5.5,
+                  ),
+                  onConfirm: (result) {
+                    if (result.coaching != null) {
+                      step.coachingAlerts.add(result.coaching!);
+                      provider.updateIntervalInPreset(presetId, step);
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (step.alerts.isEmpty && step.coachingAlerts.isEmpty)
+            const Text(
+              'Nessun avviso per questa fase',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.textMuted,
+                fontStyle: FontStyle.italic,
+              ),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ...step.alerts.map(
+                  (alert) => InputChip(
+                    label: Text(alert.name),
+                    onDeleted: () {
+                      step.alerts.removeWhere((a) => a.id == alert.id);
+                      provider.updateIntervalInPreset(presetId, step);
+                    },
+                  ),
+                ),
+                ...step.coachingAlerts.map(
+                  (alert) => InputChip(
+                    label: Text(alert.name),
+                    onDeleted: () {
+                      step.coachingAlerts.removeWhere((a) => a.id == alert.id);
+                      provider.updateIntervalInPreset(presetId, step);
+                    },
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _showIntervalStepSheet(
+    BuildContext context,
+    PresetProvider provider,
+    String presetId,
+    IntervalStep? existing,
+  ) {
+    final nameController = TextEditingController(text: existing?.name ?? '');
+    var trigger = existing?.type ?? AlertTrigger.distance;
+    final valueController = TextEditingController(
+      text: trigger == AlertTrigger.distance
+          ? existing?.distanceMeters.round().toString() ?? '1000'
+          : existing?.durationSeconds.toString() ?? '60',
+    );
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final isDistance = trigger == AlertTrigger.distance;
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                ),
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                child: SafeArea(
+                  top: false,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 44,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceHighlight,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        existing == null ? 'Nuovo Passo' : 'Modifica Passo',
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: nameController,
+                        decoration: const InputDecoration(labelText: 'Nome passo'),
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        children: ['Riscaldamento', 'Ripetuta', 'Recupero', 'Corsa Veloce', 'Defaticamento']
+                            .map((label) => ActionChip(
+                                  label: Text(label),
+                                  onPressed: () => setSheetState(() => nameController.text = label),
+                                ))
+                            .toList(),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ChoiceChip(
+                              label: const Text('Distanza'),
+                              selected: isDistance,
+                              onSelected: (_) => setSheetState(() {
+                                trigger = AlertTrigger.distance;
+                                valueController.text = existing?.distanceMeters.round().toString() ?? '1000';
+                              }),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: ChoiceChip(
+                              label: const Text('Tempo'),
+                              selected: !isDistance,
+                              onSelected: (_) => setSheetState(() {
+                                trigger = AlertTrigger.time;
+                                valueController.text = existing?.durationSeconds.toString() ?? '60';
+                              }),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: valueController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: isDistance ? 'Valore distanza' : 'Valore tempo',
+                          suffixText: isDistance ? 'm' : 'sec',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: (isDistance
+                                ? ['200', '400', '800', '1000', '2000', '5000']
+                                : ['30', '60', '90', '120', '180', '300'])
+                            .map((value) => ActionChip(
+                                  label: Text(
+                                    isDistance
+                                        ? '$value m'
+                                        : value == '120' || value == '180' || value == '300'
+                                            ? '${(int.parse(value) / 60).round()}m'
+                                            : '${value}s',
+                                  ),
+                                  onPressed: () => setSheetState(() => valueController.text = value),
+                                ))
+                            .toList(),
+                      ),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            final name = nameController.text.trim();
+                            final parsed = int.tryParse(valueController.text.trim()) ?? 0;
+                            if (name.isEmpty || parsed <= 0) return;
+                            if (existing == null) {
+                              final newStep = IntervalStep(
+                                id: DateTime.now().millisecondsSinceEpoch.toString(),
+                                name: name,
+                                type: trigger,
+                                durationSeconds: trigger == AlertTrigger.time ? parsed : 60,
+                                distanceMeters: trigger == AlertTrigger.distance ? parsed.toDouble() : 1000,
+                              );
+                              await provider.addIntervalToPreset(presetId, newStep);
+                            } else {
+                              existing.name = name;
+                              existing.type = trigger;
+                              existing.durationSeconds = trigger == AlertTrigger.time ? parsed : existing.durationSeconds;
+                              existing.distanceMeters = trigger == AlertTrigger.distance ? parsed.toDouble() : existing.distanceMeters;
+                              await provider.updateIntervalInPreset(presetId, existing);
+                            }
+                            if (context.mounted) Navigator.pop(sheetCtx);
+                          },
+                          child: const Text('Salva'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
   Widget _buildEmptyState(String message, VoidCallback onAdd) {
     return Container(
