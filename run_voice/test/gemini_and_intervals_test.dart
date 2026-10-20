@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:run_voice/models/user_profile.dart';
 import 'package:run_voice/models/preset.dart';
 import 'package:run_voice/models/alert_config.dart';
+import 'package:run_voice/models/workout_plan.dart';
 import 'package:run_voice/services/gemini_service.dart';
 
 void main() {
@@ -142,6 +143,95 @@ void main() {
       expect(restored.name, equals('Test Step'));
       expect(restored.type, equals(AlertTrigger.distance));
       expect(restored.distanceMeters, equals(800));
+    });
+  });
+
+  group('WorkoutTarget & toPreset Alerts Generation', () {
+    test('WorkoutTarget parses snake_case heart_rate_bpm and min/max bpm correctly', () {
+      final json = {
+        'metric': 'heart_rate_bpm',
+        'min_bpm': 145,
+        'max_bpm': 155,
+      };
+      final target = WorkoutTarget.fromJson(json);
+      expect(target.metric, equals(TargetMetric.heartRateBpm));
+      expect(target.targetHrBpmMin, equals(145));
+      expect(target.targetHrBpmMax, equals(155));
+      expect(target.targetHrBpm, equals(150));
+      expect(target.bpmTolerance, equals(5));
+    });
+
+    test('WorkoutTarget parses target_hr_bpm with bpm_tolerance and computes min/max', () {
+      final json = {
+        'metric': 'heart_rate_bpm',
+        'target_hr_bpm': 127,
+        'bpm_tolerance': 8,
+      };
+      final target = WorkoutTarget.fromJson(json);
+      expect(target.metric, equals(TargetMetric.heartRateBpm));
+      expect(target.targetHrBpmMin, equals(119));
+      expect(target.targetHrBpmMax, equals(135));
+    });
+
+    test('WorkoutPlan.toPreset generates coachingAlerts and step periodic alerts for BPM steps', () {
+      // Create a WorkoutPlan with 2 steps
+      final step1 = WorkoutStep(
+        id: 'step1',
+        label: 'warmup',
+        phase: StepPhase.warmup,
+        duration: const WorkoutDuration(type: 'time_seconds', value: 600),
+        target: WorkoutTarget(
+          metric: TargetMetric.heartRateBpm,
+          targetHrBpmMin: 120,
+          targetHrBpmMax: 135,
+          targetHrBpm: 127,
+          bpmTolerance: 7,
+        ),
+      );
+
+      final step2 = WorkoutStep(
+        id: 'step2',
+        label: 'work',
+        phase: StepPhase.work,
+        duration: const WorkoutDuration(type: 'time_seconds', value: 120),
+        target: WorkoutTarget(
+          metric: TargetMetric.heartRateBpm,
+          targetHrBpmMin: 145,
+          targetHrBpmMax: 155,
+          targetHrBpm: 150,
+          bpmTolerance: 5,
+        ),
+      );
+
+      final plan = WorkoutPlan(
+        id: 'test_plan',
+        name: 'Test Plan',
+        structure: WorkoutStructure.intervals,
+        steps: [step1, step2],
+      );
+
+      final preset = plan.toPreset();
+
+      // Verify first interval (warmup 600s, target 120-135 bpm)
+      expect(preset.intervals.length, equals(2));
+      expect(preset.intervals[0].coachingAlerts.length, equals(1));
+      expect(preset.intervals[0].coachingAlerts[0].metric, equals(AlertMetric.bpm));
+      expect(preset.intervals[0].coachingAlerts[0].minValue, equals(120.0));
+      expect(preset.intervals[0].coachingAlerts[0].maxValue, equals(135.0));
+
+      expect(preset.intervals[0].alerts.length, equals(1));
+      expect(preset.intervals[0].alerts[0].metric, equals(AlertMetric.bpm));
+      expect(preset.intervals[0].alerts[0].intervalSeconds, equals(60));
+
+      // Verify second interval (work 120s, target 145-155 bpm)
+      expect(preset.intervals[1].coachingAlerts.length, equals(1));
+      expect(preset.intervals[1].coachingAlerts[0].metric, equals(AlertMetric.bpm));
+      expect(preset.intervals[1].coachingAlerts[0].minValue, equals(145.0));
+      expect(preset.intervals[1].coachingAlerts[0].maxValue, equals(155.0));
+
+      expect(preset.intervals[1].alerts.length, equals(1));
+      expect(preset.intervals[1].alerts[0].metric, equals(AlertMetric.bpm));
+      expect(preset.intervals[1].alerts[0].intervalSeconds, equals(30));
     });
   });
 }

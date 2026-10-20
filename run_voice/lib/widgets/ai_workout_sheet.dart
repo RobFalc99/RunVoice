@@ -360,6 +360,10 @@ class _AiWorkoutSheetState extends State<AiWorkoutSheet> {
 
   Widget _buildPreviewCard(BuildContext context, WorkoutPlan plan) {
     final preset = plan.toPreset();
+    final totalAlerts = preset.intervals.fold<int>(
+      0,
+      (acc, i) => acc + i.alerts.length + i.coachingAlerts.length,
+    );
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -413,6 +417,38 @@ class _AiWorkoutSheetState extends State<AiWorkoutSheet> {
           const SizedBox(height: 12),
           const Divider(color: AppColors.surfaceHighlight, height: 1),
           const SizedBox(height: 10),
+          if (totalAlerts > 0) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.green.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: Colors.green.withValues(alpha: 0.25),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.volume_up,
+                    size: 14,
+                    color: Colors.green,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '✓ $totalAlerts avvisi vocali (coaching & periodici) configurati',
+                    style: const TextStyle(
+                      color: Colors.green,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
           const Text(
             "FASI DELL'ALLENAMENTO:",
             style: TextStyle(
@@ -451,13 +487,72 @@ class _AiWorkoutSheetState extends State<AiWorkoutSheet> {
                           ),
                         ),
                       ),
-                      Text(
-                        step.duration.displayString,
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            step.duration.displayString,
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          if (step.target.metric != TargetMetric.none) ...[
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceHighlight
+                                    .withValues(alpha: 0.35),
+                                borderRadius: BorderRadius.circular(999),
+                                border: Border.all(
+                                  color: AppColors.surfaceHighlight
+                                      .withValues(alpha: 0.5),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    step.target.metric == TargetMetric.heartRateBpm
+                                        ? Icons.favorite
+                                        : Icons.speed,
+                                    size: 12,
+                                    color: step.target.metric ==
+                                            TargetMetric.heartRateBpm
+                                        ? AppColors.error
+                                        : AppColors.primary,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    step.target.metric ==
+                                            TargetMetric.heartRateBpm
+                                        ? (step.target.displayHeartRate != '--'
+                                            ? step.target.displayHeartRate
+                                            : ((step.target.targetHrBpmMin != null &&
+                                                    step.target.targetHrBpmMax !=
+                                                        null)
+                                                ? '${step.target.targetHrBpmMin}-${step.target.targetHrBpmMax} bpm'
+                                                : '--'))
+                                        : step.target.displayPace,
+                                    style: TextStyle(
+                                      color: step.target.metric ==
+                                              TargetMetric.heartRateBpm
+                                          ? AppColors.error
+                                          : AppColors.primary,
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                   ),

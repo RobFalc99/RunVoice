@@ -135,19 +135,30 @@ Sei un coach di corsa esperto. Genera un piano di allenamento valido in formato 
       "phase": "warmup" | "work" | "recovery" | "cooldown",
       "duration": {
         "type": "distance_meters" | "time_seconds",
-        "value": 1000
+        "value": 600
       },
       "target": {
-        "metric": "none" | "pace" | "heart_rate_bpm",
+        "metric": "heart_rate_bpm" | "pace" | "none",
+        "target_hr_bpm_min": 120,
+        "target_hr_bpm_max": 135,
+        "target_hr_bpm": 127,
+        "bpm_tolerance": 8,
         "target_pace_sec_per_km": 300,
-        "pace_tolerance_sec": 10,
-        "target_hr_bpm": 150,
-        "bpm_tolerance": 5
+        "pace_tolerance_sec": 10
       }
     }
   ]
 }
-Restituisci ESCLUSIVAMENTE l'oggetto JSON, senza markdown né testo aggiuntivo.
+
+REGOLE FONDAMENTALI SUI TARGET CARDIO E PASSO:
+1. Se il testo contiene indicazioni di battito cardiaco o BPM (es. '120-135 bpm', '145-155 bpm', 'sotto 140 bpm'):
+   - Imposta SEMPRE `metric: "heart_rate_bpm"` per ciascuna fase interessata.
+   - Imposta `target_hr_bpm_min` e `target_hr_bpm_max` con gli estremi del range (es. 120 e 135).
+   - Calcola anche il centro `target_hr_bpm` e la semi-tolleranza `bpm_tolerance`.
+2. Se il testo contiene indicazioni di passo/ritmo (es. '4:30/km', '5 min/km'):
+   - Imposta `metric: "pace"` con `target_pace_sec_per_km` in secondi (es. 270 per 4:30) e `pace_tolerance_sec: 10`.
+3. Riconosci le ripetizioni ('8x(2'+2')') espandendole in sequenze alternate di step di lavoro ('work') e recupero ('recovery') con i rispettivi target cardio/passo.
+4. Restituisci ESCLUSIVAMENTE l'oggetto JSON, senza markdown né testo aggiuntivo.
 ''';
 
     final response = await http.post(

@@ -60,6 +60,10 @@ class WorkoutTarget {
   final int? targetHrZoneMin;
   final int? targetHrZoneMax;
   final int? targetHrBpm;
+  final int? targetHrBpmMin;
+  final int? targetHrBpmMax;
+  final int? targetPaceSecPerKmMin;
+  final int? targetPaceSecPerKmMax;
   final int? bpmTolerance;
   final int? targetCadence;
   final int? cadenceTolerance;
@@ -71,6 +75,10 @@ class WorkoutTarget {
     this.targetHrZoneMin,
     this.targetHrZoneMax,
     this.targetHrBpm,
+    this.targetHrBpmMin,
+    this.targetHrBpmMax,
+    this.targetPaceSecPerKmMin,
+    this.targetPaceSecPerKmMax,
     this.bpmTolerance,
     this.targetCadence,
     this.cadenceTolerance,
@@ -85,8 +93,12 @@ class WorkoutTarget {
     if (targetHrZoneMin != null && targetHrZoneMax != null && targetHrZoneMin! > targetHrZoneMax!) {
       return false;
     }
+    if (targetHrBpmMin != null && targetHrBpmMin! <= 0) return false;
+    if (targetHrBpmMax != null && targetHrBpmMax! <= 0) return false;
     if (targetHrBpm != null && targetHrBpm! <= 0) return false;
     if (bpmTolerance != null && bpmTolerance! < 0) return false;
+    if (targetPaceSecPerKmMin != null && targetPaceSecPerKmMin! <= 0) return false;
+    if (targetPaceSecPerKmMax != null && targetPaceSecPerKmMax! <= 0) return false;
     if (targetCadence != null && targetCadence! <= 0) return false;
     if (cadenceTolerance != null && cadenceTolerance! < 0) return false;
     return true;
@@ -99,6 +111,10 @@ class WorkoutTarget {
     if (targetHrZoneMin != null) map['target_hr_zone_min'] = targetHrZoneMin;
     if (targetHrZoneMax != null) map['target_hr_zone_max'] = targetHrZoneMax;
     if (targetHrBpm != null) map['target_hr_bpm'] = targetHrBpm;
+    if (targetHrBpmMin != null) map['target_hr_bpm_min'] = targetHrBpmMin;
+    if (targetHrBpmMax != null) map['target_hr_bpm_max'] = targetHrBpmMax;
+    if (targetPaceSecPerKmMin != null) map['target_pace_sec_per_km_min'] = targetPaceSecPerKmMin;
+    if (targetPaceSecPerKmMax != null) map['target_pace_sec_per_km_max'] = targetPaceSecPerKmMax;
     if (bpmTolerance != null) map['bpm_tolerance'] = bpmTolerance;
     if (targetCadence != null) map['target_cadence'] = targetCadence;
     if (cadenceTolerance != null) map['cadence_tolerance'] = cadenceTolerance;
@@ -106,19 +122,42 @@ class WorkoutTarget {
   }
 
   factory WorkoutTarget.fromJson(Map<String, dynamic> json) {
-    final metricStr = json['metric'] as String? ?? 'none';
-    final metric = TargetMetric.values.firstWhere(
-      (m) => m.name == metricStr,
-      orElse: () => TargetMetric.none,
-    );
+    final metricRaw = json['metric']?.toString().toLowerCase().replaceAll('_', '').replaceAll(' ', '') ?? '';
+    int? minBpm = json['target_hr_bpm_min'] as int? ?? json['min_bpm'] as int? ?? json['target_hr_min'] as int? ?? json['hr_min'] as int?;
+    int? maxBpm = json['target_hr_bpm_max'] as int? ?? json['max_bpm'] as int? ?? json['target_hr_max'] as int? ?? json['hr_max'] as int?;
+    int? centerBpm = json['target_hr_bpm'] as int? ?? json['target_bpm'] as int? ?? json['bpm'] as int?;
+    int? bpmTol = json['bpm_tolerance'] as int? ?? json['tolerance'] as int?;
+    if (minBpm == null && centerBpm != null && bpmTol != null) {
+      minBpm = centerBpm - bpmTol;
+      maxBpm = centerBpm + bpmTol;
+    } else if (centerBpm == null && minBpm != null && maxBpm != null) {
+      centerBpm = ((minBpm + maxBpm) / 2).round();
+      bpmTol = ((maxBpm - minBpm) / 2).round();
+    }
+    TargetMetric metric;
+    if (metricRaw.contains('zone')) {
+      metric = TargetMetric.heartRateZone;
+    } else if (metricRaw.contains('bpm') || metricRaw.contains('heart') || metricRaw.contains('cardio') || minBpm != null || centerBpm != null) {
+      metric = TargetMetric.heartRateBpm;
+    } else if (metricRaw.contains('pace') || metricRaw.contains('ritmo') || json['target_pace_sec_per_km'] != null) {
+      metric = TargetMetric.pace;
+    } else if (metricRaw.contains('cadence') || metricRaw.contains('cadenza')) {
+      metric = TargetMetric.cadence;
+    } else {
+      metric = TargetMetric.none;
+    }
     return WorkoutTarget(
       metric: metric,
       targetPaceSecPerKm: json['target_pace_sec_per_km'] as int?,
+      targetPaceSecPerKmMin: json['target_pace_sec_per_km_min'] as int?,
+      targetPaceSecPerKmMax: json['target_pace_sec_per_km_max'] as int?,
       paceToleranceSec: json['pace_tolerance_sec'] as int?,
       targetHrZoneMin: json['target_hr_zone_min'] as int?,
       targetHrZoneMax: json['target_hr_zone_max'] as int?,
-      targetHrBpm: json['target_hr_bpm'] as int?,
-      bpmTolerance: json['bpm_tolerance'] as int?,
+      targetHrBpm: centerBpm ?? json['target_hr_bpm'] as int?,
+      targetHrBpmMin: minBpm,
+      targetHrBpmMax: maxBpm,
+      bpmTolerance: bpmTol,
       targetCadence: json['target_cadence'] as int?,
       cadenceTolerance: json['cadence_tolerance'] as int?,
     );
@@ -368,6 +407,19 @@ class WorkoutPlan {
   Preset toPreset() {
     final isIntervals = structure != WorkoutStructure.continuous || steps.any((s) => s.isRepeatBlock);
     final intervals = <IntervalStep>[];
+    final globalAlerts = <AlertConfig>[];
+
+    if (announceSplits) {
+      globalAlerts.add(AlertConfig(
+        id: 'global_split_time',
+        name: 'Tempo trascorso',
+        metric: AlertMetric.time,
+        mode: AlertMode.total,
+        trigger: AlertTrigger.time,
+        intervalSeconds: 300,
+        enabled: true,
+      ));
+    }
 
     void flattenStep(WorkoutStep step, {int depth = 0}) {
       // Protezione contro nidificazione eccessiva (max 10 livelli)
@@ -380,12 +432,40 @@ class WorkoutPlan {
           }
         }
       } else {
-        // Crea coaching alerts dal target del step
         final coachingAlerts = <CoachingAlert>[];
+        final stepAlerts = <AlertConfig>[];
         
+        if (step.target.metric == TargetMetric.heartRateBpm && (step.target.targetHrBpm != null || step.target.targetHrBpmMin != null)) {
+          final minB = (step.target.targetHrBpmMin ?? (step.target.targetHrBpm! - (step.target.bpmTolerance ?? 5))).toDouble().clamp(40.0, 240.0);
+          final maxB = (step.target.targetHrBpmMax ?? (step.target.targetHrBpm! + (step.target.bpmTolerance ?? 5))).toDouble().clamp(40.0, 240.0);
+          coachingAlerts.add(CoachingAlert(
+            id: '${step.id}_hr',
+            name: 'BPM ${minB.round()}-${maxB.round()}',
+            metric: AlertMetric.bpm,
+            minValue: minB,
+            maxValue: maxB,
+            enabled: true,
+            speakCurrentValue: true,
+            okIntervalSeconds: 60,
+            outOfRangeDelaySeconds: 10,
+            notifyOnReturn: true,
+          ));
+          if (step.duration.inSeconds >= 60) {
+            stepAlerts.add(AlertConfig(
+              id: '${step.id}_periodic_bpm',
+              name: 'Battito cardiaco',
+              metric: AlertMetric.bpm,
+              mode: AlertMode.current,
+              trigger: AlertTrigger.time,
+              intervalSeconds: step.duration.inSeconds >= 180 ? 60 : 30,
+              enabled: true,
+            ));
+          }
+        }
+
         if (step.target.metric == TargetMetric.pace && step.target.targetPaceSecPerKm != null) {
           final paceMinPerKm = step.target.targetPaceSecPerKm! / 60.0;
-          final tolerance = (step.target.paceToleranceSec ?? 5) / 60.0;
+          final tolerance = (step.target.paceToleranceSec ?? 10) / 60.0;
           coachingAlerts.add(CoachingAlert(
             id: '${step.id}_pace',
             name: 'Ritmo controllato',
@@ -393,19 +473,22 @@ class WorkoutPlan {
             minValue: (paceMinPerKm - tolerance).clamp(0.0, double.infinity),
             maxValue: paceMinPerKm + tolerance,
             enabled: true,
-            speakCurrentValue: false,
+            speakCurrentValue: true,
+            okIntervalSeconds: 60,
+            outOfRangeDelaySeconds: 10,
+            notifyOnReturn: true,
           ));
-        } else if (step.target.metric == TargetMetric.heartRateBpm && step.target.targetHrBpm != null) {
-          final tolerance = step.target.bpmTolerance ?? 5;
-          coachingAlerts.add(CoachingAlert(
-            id: '${step.id}_hr',
-            name: 'Frequenza cardiaca controllata',
-            metric: AlertMetric.bpm,
-            minValue: (step.target.targetHrBpm! - tolerance).toDouble().clamp(0.0, double.infinity),
-            maxValue: (step.target.targetHrBpm! + tolerance).toDouble(),
-            enabled: true,
-            speakCurrentValue: false,
-          ));
+          if (step.duration.inSeconds >= 60) {
+            stepAlerts.add(AlertConfig(
+              id: '${step.id}_periodic_pace',
+              name: 'Ritmo',
+              metric: AlertMetric.pace,
+              mode: AlertMode.current,
+              trigger: AlertTrigger.time,
+              intervalSeconds: step.duration.inSeconds >= 180 ? 60 : 30,
+              enabled: true,
+            ));
+          }
         } else if (step.target.metric == TargetMetric.heartRateZone && 
                    step.target.targetHrZoneMin != null && 
                    step.target.targetHrZoneMax != null) {
@@ -426,6 +509,7 @@ class WorkoutPlan {
           type: step.duration.isTime ? AlertTrigger.time : AlertTrigger.distance,
           durationSeconds: step.duration.inSeconds > 0 ? step.duration.inSeconds : 60,
           distanceMeters: step.duration.inMeters > 0 ? step.duration.inMeters : 1000.0,
+          alerts: stepAlerts,
           coachingAlerts: coachingAlerts,
         ));
       }
@@ -441,6 +525,7 @@ class WorkoutPlan {
       description: description,
       isIntervalTraining: isIntervals,
       intervals: intervals,
+      alerts: globalAlerts,
       announceStart: announceStart,
       announceEnd: announceEnd,
       announceSummary: announceSplits,
