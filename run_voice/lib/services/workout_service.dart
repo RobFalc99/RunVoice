@@ -134,11 +134,14 @@ class WorkoutService {
         _speedKmh = 60 / _paceMinPerKm;
       }
 
+      // ALWAYS evaluate global distance alerts first so total-distance
+      // checkpoints can fire across both interval and non-interval phases.
+      _checkDistanceAlerts();
+
       if (_activePreset?.isIntervalTraining == true) {
+        // Then evaluate interval progression and step-specific distance alerts.
         _evaluateIntervals();
         _checkStepDistanceAlerts();
-      } else {
-        _checkDistanceAlerts();
       }
       onDataUpdated?.call();
     };
@@ -165,11 +168,13 @@ class WorkoutService {
           heartRate: _currentHeartRate,
         ));
 
+        // ALWAYS evaluate the global coaching alerts (preset-level).
+        _evaluateCoachingAlerts();
+
         if (_activePreset?.isIntervalTraining == true) {
+          // Additionally evaluate interval progression and step coaching alerts.
           _evaluateIntervals();
           _evaluateStepCoachingAlerts();
-        } else {
-          _evaluateCoachingAlerts();
         }
 
         onDataUpdated?.call();
@@ -178,6 +183,12 @@ class WorkoutService {
 
     _state = WorkoutState.running;
     onStateChanged?.call(_state);
+
+    // ALWAYS initialize global preset alerts (time-based timers + distance
+    // checkpoints) so they fire regardless of whether the workout is an
+    // interval session or a single-phase session.
+    _setupAlertTimers(preset);
+    _initDistanceCheckpoints(preset);
 
     if (_activePreset!.isIntervalTraining &&
         _activePreset!.intervals.isNotEmpty) {
@@ -194,10 +205,9 @@ class WorkoutService {
           '${prefix}Allenamento iniziato. Prima fase: ${_activePreset!.intervals.first.name}',
         );
       }
+      // Additionally, set up interval-specific alerts for the first step.
       _setupIntervalSpecificAlerts();
     } else {
-      _setupAlertTimers(preset);
-      _initDistanceCheckpoints(preset);
       if (_activePreset!.announceStart) {
         final prefix =
             (speakName && userName != null && userName.isNotEmpty)
@@ -437,6 +447,8 @@ class WorkoutService {
     if (_state != WorkoutState.running) return;
     _pauseTime = DateTime.now();
     _state = WorkoutState.paused;
+    // Clean up BOTH alert timer maps while paused so no stale events fire.
+    _cancelAllAlertTimers();
     onStateChanged?.call(_state);
     _ttsService.enqueue('Allenamento in pausa');
   }
@@ -447,20 +459,17 @@ class WorkoutService {
     _pausedDuration += DateTime.now().difference(_pauseTime!);
     _pauseTime = null;
     _state = WorkoutState.running;
+    // Re-arm BOTH alert timer maps (re-build them after pause cleanup).
+    _rearmAllAlertTimers();
     onStateChanged?.call(_state);
     _ttsService.enqueue('Allenamento ripreso');
   }
 
   /// Stop workout
   Future<void> stopWorkout() async {
-    // Cancel all timers
+    // Cancel all timers (global + step + periodic clock).
     _workoutTimer?.cancel();
-    for (final timer in _alertTimers.values) {
-      timer.cancel();
-    }
-    _alertTimers.clear();
-    _alertDistanceCheckpoints.clear();
-    _cleanupIntervalSpecificAlerts();
+    _cancelAllAlertTimers();
 
     // Stop tracking
     _locationService.stopTracking();
@@ -488,14 +497,43 @@ class WorkoutService {
 
   void dispose() {
     _workoutTimer?.cancel();
+    _cancelAllAlertTimers();
+    _bluetoothService.onHeartRateUpdate = null;
+    _locationService.onDistanceUpdate = null;
+    _locationService.onPaceUpdate = null;
+  }
+
+  /// Cancel and clear BOTH global and step alert timer collections along
+  /// with their associated distance checkpoints.
+  void _cancelAllAlertTimers() {
     for (final timer in _alertTimers.values) {
       timer.cancel();
     }
     _alertTimers.clear();
-    _cleanupIntervalSpecificAlerts();
-    _bluetoothService.onHeartRateUpdate = null;
-    _locationService.onDistanceUpdate = null;
-    _locationService.onPaceUpdate = null;
+    _alertDistanceCheckpoints.clear();
+
+    for (final timer in _stepAlertTimers.values) {
+      timer.cancel();
+    }
+    _stepAlertTimers.clear();
+    _stepAlertDistanceCheckpoints.clear();
+  }
+
+  /// Re-arm BOTH alert timer collections (used after a pause cleared them).
+  void _rearmAllAlertTimers() {
+    final preset = _activePreset;
+    if (preset == null || _state != WorkoutState.running) return;
+
+    // Global preset alerts.
+    _setupAlertTimers(preset);
+    _initDistanceCheckpoints(preset);
+
+    // Interval-specific alerts (only if a valid step is active).
+    if (preset.isIntervalTraining &&
+        preset.intervals.isNotEmpty &&
+        _currentIntervalIndex < preset.intervals.length) {
+      _setupIntervalSpecificAlerts();
+    }
   }
 
   void _setupIntervalSpecificAlerts() {

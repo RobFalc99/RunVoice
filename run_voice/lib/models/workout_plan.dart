@@ -4,6 +4,168 @@ import 'alert_config.dart';
 
 enum WorkoutStructure { continuous, intervals, pyramid, fartlek }
 
+/// Represents a periodic alert plan that can be converted to AlertConfig
+class WorkoutAlertPlan {
+  final String name;
+  final String metric; // 'distance', 'time', 'bpm', 'pace'
+  final String trigger; // 'time', 'distance'
+  final int? intervalSeconds;
+  final double? intervalMeters;
+  final String mode; // 'total', 'current', 'split'
+
+  const WorkoutAlertPlan({
+    required this.name,
+    required this.metric,
+    required this.trigger,
+    this.intervalSeconds,
+    this.intervalMeters,
+    this.mode = 'current',
+  });
+
+  /// Convert to AlertMetric enum
+  AlertMetric _toAlertMetric() {
+    switch (metric.toLowerCase()) {
+      case 'distance':
+        return AlertMetric.distance;
+      case 'time':
+        return AlertMetric.time;
+      case 'bpm':
+        return AlertMetric.bpm;
+      case 'pace':
+        return AlertMetric.pace;
+      case 'speed':
+        return AlertMetric.speed;
+      case 'hrzone':
+      case 'hr_zone':
+        return AlertMetric.hrZone;
+      default:
+        return AlertMetric.time;
+    }
+  }
+
+  /// Convert to AlertMode enum
+  AlertMode _toAlertMode() {
+    switch (mode.toLowerCase()) {
+      case 'total':
+        return AlertMode.total;
+      case 'interval':
+        return AlertMode.interval;
+      case 'lap':
+        return AlertMode.lap;
+      case 'current':
+      default:
+        return AlertMode.current;
+    }
+  }
+
+  /// Convert to AlertTrigger enum
+  AlertTrigger _toAlertTrigger() {
+    switch (trigger.toLowerCase()) {
+      case 'distance':
+        return AlertTrigger.distance;
+      case 'time':
+      default:
+        return AlertTrigger.time;
+    }
+  }
+
+  /// Convert WorkoutAlertPlan to AlertConfig
+  AlertConfig toAlertConfig(String idPrefix) {
+    return AlertConfig(
+      id: '${idPrefix}_${name.replaceAll(' ', '_').toLowerCase()}',
+      name: name,
+      metric: _toAlertMetric(),
+      mode: _toAlertMode(),
+      trigger: _toAlertTrigger(),
+      intervalSeconds: intervalSeconds ?? 60,
+      intervalMeters: intervalMeters ?? 1000.0,
+      enabled: true,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'metric': metric,
+    'trigger': trigger,
+    if (intervalSeconds != null) 'interval_seconds': intervalSeconds,
+    if (intervalMeters != null) 'interval_meters': intervalMeters,
+    'mode': mode,
+  };
+
+  factory WorkoutAlertPlan.fromJson(Map<String, dynamic> json) =>
+      WorkoutAlertPlan(
+        name: json['name'] as String? ?? 'Alert',
+        metric: json['metric'] as String? ?? 'time',
+        trigger: json['trigger'] as String? ?? 'time',
+        intervalSeconds: (json['interval_seconds'] as num?)?.round(),
+        intervalMeters: (json['interval_meters'] as num?)?.toDouble(),
+        mode: json['mode'] as String? ?? 'current',
+      );
+}
+
+/// Represents a coaching alert plan that can be converted to CoachingAlert
+class WorkoutCoachingPlan {
+  final String name;
+  final String metric; // 'bpm', 'pace', 'hr_zone'
+  final double? minValue;
+  final double? maxValue;
+
+  const WorkoutCoachingPlan({
+    required this.name,
+    required this.metric,
+    this.minValue,
+    this.maxValue,
+  });
+
+  /// Convert to AlertMetric enum
+  AlertMetric _toAlertMetric() {
+    switch (metric.toLowerCase()) {
+      case 'bpm':
+        return AlertMetric.bpm;
+      case 'pace':
+        return AlertMetric.pace;
+      case 'hr_zone':
+      case 'hrzone':
+        return AlertMetric.hrZone;
+      case 'speed':
+        return AlertMetric.speed;
+      default:
+        return AlertMetric.bpm;
+    }
+  }
+
+  /// Convert WorkoutCoachingPlan to CoachingAlert
+  CoachingAlert toCoachingAlert(String idPrefix) {
+    return CoachingAlert(
+      id: '${idPrefix}_${name.replaceAll(' ', '_').toLowerCase()}',
+      name: name,
+      metric: _toAlertMetric(),
+      minValue: minValue ?? 0.0,
+      maxValue: maxValue ?? 200.0,
+      enabled: true,
+      speakCurrentValue: true,
+      okIntervalSeconds: 60,
+      outOfRangeDelaySeconds: 10,
+      notifyOnReturn: true,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'metric': metric,
+    if (minValue != null) 'min_value': minValue,
+    if (maxValue != null) 'max_value': maxValue,
+  };
+
+  factory WorkoutCoachingPlan.fromJson(Map<String, dynamic> json) =>
+      WorkoutCoachingPlan(
+        name: json['name'] as String? ?? 'Coaching',
+        metric: json['metric'] as String? ?? 'bpm',
+        minValue: (json['min_value'] as num?)?.toDouble(),
+        maxValue: (json['max_value'] as num?)?.toDouble(),
+      );
+}
+
 enum StepPhase { warmup, work, recovery, cooldown, open }
 
 enum TargetMetric { none, pace, heartRateZone, heartRateBpm, cadence }
@@ -123,10 +285,10 @@ class WorkoutTarget {
 
   factory WorkoutTarget.fromJson(Map<String, dynamic> json) {
     final metricRaw = json['metric']?.toString().toLowerCase().replaceAll('_', '').replaceAll(' ', '') ?? '';
-    int? minBpm = json['target_hr_bpm_min'] as int? ?? json['min_bpm'] as int? ?? json['target_hr_min'] as int? ?? json['hr_min'] as int?;
-    int? maxBpm = json['target_hr_bpm_max'] as int? ?? json['max_bpm'] as int? ?? json['target_hr_max'] as int? ?? json['hr_max'] as int?;
-    int? centerBpm = json['target_hr_bpm'] as int? ?? json['target_bpm'] as int? ?? json['bpm'] as int?;
-    int? bpmTol = json['bpm_tolerance'] as int? ?? json['tolerance'] as int?;
+    int? minBpm = (json['target_hr_bpm_min'] as num?)?.round() ?? (json['min_bpm'] as num?)?.round() ?? (json['target_hr_min'] as num?)?.round() ?? (json['hr_min'] as num?)?.round();
+    int? maxBpm = (json['target_hr_bpm_max'] as num?)?.round() ?? (json['max_bpm'] as num?)?.round() ?? (json['target_hr_max'] as num?)?.round() ?? (json['hr_max'] as num?)?.round();
+    int? centerBpm = (json['target_hr_bpm'] as num?)?.round() ?? (json['target_bpm'] as num?)?.round() ?? (json['bpm'] as num?)?.round();
+    int? bpmTol = (json['bpm_tolerance'] as num?)?.round() ?? (json['tolerance'] as num?)?.round();
     if (minBpm == null && centerBpm != null && bpmTol != null) {
       minBpm = centerBpm - bpmTol;
       maxBpm = centerBpm + bpmTol;
@@ -148,18 +310,18 @@ class WorkoutTarget {
     }
     return WorkoutTarget(
       metric: metric,
-      targetPaceSecPerKm: json['target_pace_sec_per_km'] as int?,
-      targetPaceSecPerKmMin: json['target_pace_sec_per_km_min'] as int?,
-      targetPaceSecPerKmMax: json['target_pace_sec_per_km_max'] as int?,
-      paceToleranceSec: json['pace_tolerance_sec'] as int?,
-      targetHrZoneMin: json['target_hr_zone_min'] as int?,
-      targetHrZoneMax: json['target_hr_zone_max'] as int?,
-      targetHrBpm: centerBpm ?? json['target_hr_bpm'] as int?,
+      targetPaceSecPerKm: (json['target_pace_sec_per_km'] as num?)?.round(),
+      targetPaceSecPerKmMin: (json['target_pace_sec_per_km_min'] as num?)?.round(),
+      targetPaceSecPerKmMax: (json['target_pace_sec_per_km_max'] as num?)?.round(),
+      paceToleranceSec: (json['pace_tolerance_sec'] as num?)?.round(),
+      targetHrZoneMin: (json['target_hr_zone_min'] as num?)?.round(),
+      targetHrZoneMax: (json['target_hr_zone_max'] as num?)?.round(),
+      targetHrBpm: centerBpm ?? (json['target_hr_bpm'] as num?)?.round(),
       targetHrBpmMin: minBpm,
       targetHrBpmMax: maxBpm,
       bpmTolerance: bpmTol,
-      targetCadence: json['target_cadence'] as int?,
-      cadenceTolerance: json['cadence_tolerance'] as int?,
+      targetCadence: (json['target_cadence'] as num?)?.round(),
+      cadenceTolerance: (json['cadence_tolerance'] as num?)?.round(),
     );
   }
 
@@ -204,6 +366,14 @@ class WorkoutStep {
   int repeatCount;
   List<WorkoutStep> subSteps;
 
+  // Avvisi periodici e di coaching (AlertConfig e CoachingAlert)
+  List<AlertConfig> periodicAlerts;
+  List<CoachingAlert> coachingAlerts;
+
+  // Plans for alerts and coaching (new fields for structured definitions)
+  List<WorkoutAlertPlan> periodicAlertPlans;
+  List<WorkoutCoachingPlan> coachingAlertPlans;
+
   WorkoutStep({
     required this.id,
     required this.label,
@@ -213,7 +383,15 @@ class WorkoutStep {
     this.voiceCue,
     this.repeatCount = 1,
     List<WorkoutStep>? subSteps,
-  }) : subSteps = subSteps ?? [];
+    List<AlertConfig>? periodicAlerts,
+    List<CoachingAlert>? coachingAlerts,
+    List<WorkoutAlertPlan>? periodicAlertPlans,
+    List<WorkoutCoachingPlan>? coachingAlertPlans,
+  }) : subSteps = subSteps ?? [],
+       periodicAlerts = periodicAlerts ?? [],
+       coachingAlerts = coachingAlerts ?? [],
+       periodicAlertPlans = periodicAlertPlans ?? [],
+       coachingAlertPlans = coachingAlertPlans ?? [];
 
   bool get isRepeatBlock => repeatCount > 1 || subSteps.isNotEmpty;
 
@@ -275,6 +453,10 @@ class WorkoutStep {
     if (voiceCue != null) 'voice_cue': voiceCue,
     if (repeatCount > 1) 'repeat_count': repeatCount,
     if (subSteps.isNotEmpty) 'sub_steps': subSteps.map((s) => s.toJson()).toList(),
+    if (periodicAlerts.isNotEmpty) 'periodic_alerts': periodicAlerts.map((a) => a.toJson()).toList(),
+    if (coachingAlerts.isNotEmpty) 'coaching_alerts': coachingAlerts.map((a) => a.toJson()).toList(),
+    if (periodicAlertPlans.isNotEmpty) 'periodic_alert_plans': periodicAlertPlans.map((a) => a.toJson()).toList(),
+    if (coachingAlertPlans.isNotEmpty) 'coaching_alert_plans': coachingAlertPlans.map((a) => a.toJson()).toList(),
   };
 
   factory WorkoutStep.fromJson(Map<String, dynamic> json) => WorkoutStep(
@@ -295,6 +477,14 @@ class WorkoutStep {
     subSteps: (json['sub_steps'] as List<dynamic>?)
         ?.map((s) => WorkoutStep.fromJson(s as Map<String, dynamic>))
         .toList(),
+    periodicAlerts: const [],
+    coachingAlerts: const [],
+    periodicAlertPlans: (json['periodic_alerts'] as List<dynamic>? ?? json['periodic_alert_plans'] as List<dynamic>?)
+        ?.map((a) => WorkoutAlertPlan.fromJson(a as Map<String, dynamic>))
+        .toList(),
+    coachingAlertPlans: (json['coaching_alerts'] as List<dynamic>? ?? json['coaching_alert_plans'] as List<dynamic>?)
+        ?.map((a) => WorkoutCoachingPlan.fromJson(a as Map<String, dynamic>))
+        .toList(),
   );
 }
 
@@ -308,6 +498,8 @@ class WorkoutPlan {
   bool announceSplits;
   bool announceEnd;
   List<WorkoutStep> steps;
+  List<AlertConfig> globalAlerts;
+  List<WorkoutAlertPlan> globalAlertPlans;
 
   WorkoutPlan({
     this.version = '1.0',
@@ -319,7 +511,11 @@ class WorkoutPlan {
     this.announceSplits = true,
     this.announceEnd = true,
     List<WorkoutStep>? steps,
-  }) : steps = steps ?? [];
+    List<AlertConfig>? globalAlerts,
+    List<WorkoutAlertPlan>? globalAlertPlans,
+  }) : steps = steps ?? [],
+       globalAlerts = globalAlerts ?? [],
+       globalAlertPlans = globalAlertPlans ?? [];
 
   bool get isValid {
     if (name.isEmpty) return false;
@@ -370,6 +566,8 @@ class WorkoutPlan {
       'announce_splits': announceSplits,
       'announce_end': announceEnd,
     },
+    if (globalAlerts.isNotEmpty) 'global_alerts': globalAlerts.map((a) => a.toJson()).toList(),
+    if (globalAlertPlans.isNotEmpty) 'global_alert_plans': globalAlertPlans.map((a) => a.toJson()).toList(),
     'steps': steps.map((s) => s.toJson()).toList(),
   };
 
@@ -395,6 +593,10 @@ class WorkoutPlan {
       announceStart: coaching['announce_start'] as bool? ?? true,
       announceSplits: coaching['announce_splits'] as bool? ?? true,
       announceEnd: coaching['announce_end'] as bool? ?? true,
+      globalAlerts: const [],
+      globalAlertPlans: (json['global_alerts'] as List<dynamic>? ?? json['global_alert_plans'] as List<dynamic>?)
+          ?.map((a) => WorkoutAlertPlan.fromJson(a as Map<String, dynamic>))
+          .toList(),
       steps: (json['steps'] as List<dynamic>?)
           ?.map((s) => WorkoutStep.fromJson(s as Map<String, dynamic>))
           .toList(),
@@ -402,15 +604,24 @@ class WorkoutPlan {
   }
 
   /// Converte il WorkoutPlan nel Preset esistente per garantire retrocompatibilità
+  /// ALWAYS sets isIntervalTraining: true per interval training consistente.
   /// Nota: i target specifici (pace, HR zone, cadence) della versione 2.0 non sono
   /// completamente rappresentabili nel modello Preset legacy. Questa è una conversione best-effort.
   Preset toPreset() {
-    final isIntervals = structure != WorkoutStructure.continuous || steps.any((s) => s.isRepeatBlock);
+    // ALWAYS set isIntervalTraining: true for interval training structures
     final intervals = <IntervalStep>[];
-    final globalAlerts = <AlertConfig>[];
+    final presetGlobalAlerts = <AlertConfig>[];
 
-    if (announceSplits) {
-      globalAlerts.add(AlertConfig(
+    // Map globalAlerts to preset.alerts
+    presetGlobalAlerts.addAll(globalAlerts);
+
+    // Convert globalAlertPlans to AlertConfig and add to alerts
+    for (final plan in globalAlertPlans) {
+      presetGlobalAlerts.add(plan.toAlertConfig('global'));
+    }
+
+    if (announceSplits && !presetGlobalAlerts.any((a) => a.metric == AlertMetric.time && a.trigger == AlertTrigger.time)) {
+      presetGlobalAlerts.add(AlertConfig(
         id: 'global_split_time',
         name: 'Tempo trascorso',
         metric: AlertMetric.time,
@@ -435,72 +646,91 @@ class WorkoutPlan {
         final coachingAlerts = <CoachingAlert>[];
         final stepAlerts = <AlertConfig>[];
         
-        if (step.target.metric == TargetMetric.heartRateBpm && (step.target.targetHrBpm != null || step.target.targetHrBpmMin != null)) {
-          final minB = (step.target.targetHrBpmMin ?? (step.target.targetHrBpm! - (step.target.bpmTolerance ?? 5))).toDouble().clamp(40.0, 240.0);
-          final maxB = (step.target.targetHrBpmMax ?? (step.target.targetHrBpm! + (step.target.bpmTolerance ?? 5))).toDouble().clamp(40.0, 240.0);
-          coachingAlerts.add(CoachingAlert(
-            id: '${step.id}_hr',
-            name: 'BPM ${minB.round()}-${maxB.round()}',
-            metric: AlertMetric.bpm,
-            minValue: minB,
-            maxValue: maxB,
-            enabled: true,
-            speakCurrentValue: true,
-            okIntervalSeconds: 60,
-            outOfRangeDelaySeconds: 10,
-            notifyOnReturn: true,
-          ));
-          if (step.duration.inSeconds >= 60) {
-            stepAlerts.add(AlertConfig(
-              id: '${step.id}_periodic_bpm',
-              name: 'Battito cardiaco',
-              metric: AlertMetric.bpm,
-              mode: AlertMode.current,
-              trigger: AlertTrigger.time,
-              intervalSeconds: step.duration.inSeconds >= 180 ? 60 : 30,
-              enabled: true,
-            ));
-          }
+        // Map step.periodicAlerts to IntervalStep.alerts
+        stepAlerts.addAll(step.periodicAlerts);
+        
+        // Convert step.periodicAlertPlans to AlertConfig
+        for (final plan in step.periodicAlertPlans) {
+          stepAlerts.add(plan.toAlertConfig(step.id));
         }
-
-        if (step.target.metric == TargetMetric.pace && step.target.targetPaceSecPerKm != null) {
-          final paceMinPerKm = step.target.targetPaceSecPerKm! / 60.0;
-          final tolerance = (step.target.paceToleranceSec ?? 10) / 60.0;
-          coachingAlerts.add(CoachingAlert(
-            id: '${step.id}_pace',
-            name: 'Ritmo controllato',
-            metric: AlertMetric.pace,
-            minValue: (paceMinPerKm - tolerance).clamp(0.0, double.infinity),
-            maxValue: paceMinPerKm + tolerance,
-            enabled: true,
-            speakCurrentValue: true,
-            okIntervalSeconds: 60,
-            outOfRangeDelaySeconds: 10,
-            notifyOnReturn: true,
-          ));
-          if (step.duration.inSeconds >= 60) {
-            stepAlerts.add(AlertConfig(
-              id: '${step.id}_periodic_pace',
-              name: 'Ritmo',
-              metric: AlertMetric.pace,
-              mode: AlertMode.current,
-              trigger: AlertTrigger.time,
-              intervalSeconds: step.duration.inSeconds >= 180 ? 60 : 30,
+        
+        // Map step.coachingAlerts to IntervalStep.coachingAlerts (DIRECTLY)
+        coachingAlerts.addAll(step.coachingAlerts);
+        
+        // Convert step.coachingAlertPlans to CoachingAlert
+        for (final plan in step.coachingAlertPlans) {
+          coachingAlerts.add(plan.toCoachingAlert(step.id));
+        }
+        
+        // FALLBACK: Generate coaching_alerts from step.target if no explicit coaching alerts exist
+        if (coachingAlerts.isEmpty && step.target.metric != TargetMetric.none) {
+          if (step.target.metric == TargetMetric.heartRateBpm && (step.target.targetHrBpm != null || step.target.targetHrBpmMin != null)) {
+            final minB = (step.target.targetHrBpmMin ?? (step.target.targetHrBpm! - (step.target.bpmTolerance ?? 5))).toDouble().clamp(40.0, 240.0);
+            final maxB = (step.target.targetHrBpmMax ?? (step.target.targetHrBpm! + (step.target.bpmTolerance ?? 5))).toDouble().clamp(40.0, 240.0);
+            coachingAlerts.add(CoachingAlert(
+              id: '${step.id}_hr',
+              name: 'BPM ${minB.round()}-${maxB.round()}',
+              metric: AlertMetric.bpm,
+              minValue: minB,
+              maxValue: maxB,
               enabled: true,
+              speakCurrentValue: true,
+              okIntervalSeconds: 60,
+              outOfRangeDelaySeconds: 10,
+              notifyOnReturn: true,
+            ));
+            if (step.duration.inSeconds >= 60 && !stepAlerts.any((a) => a.metric == AlertMetric.bpm && a.id == '${step.id}_periodic_bpm')) {
+              stepAlerts.add(AlertConfig(
+                id: '${step.id}_periodic_bpm',
+                name: 'Battito cardiaco',
+                metric: AlertMetric.bpm,
+                mode: AlertMode.current,
+                trigger: AlertTrigger.time,
+                intervalSeconds: step.duration.inSeconds >= 180 ? 60 : 30,
+                enabled: true,
+              ));
+            }
+          }
+
+          if (step.target.metric == TargetMetric.pace && step.target.targetPaceSecPerKm != null) {
+            final paceMinPerKm = step.target.targetPaceSecPerKm! / 60.0;
+            final tolerance = (step.target.paceToleranceSec ?? 10) / 60.0;
+            coachingAlerts.add(CoachingAlert(
+              id: '${step.id}_pace',
+              name: 'Ritmo controllato',
+              metric: AlertMetric.pace,
+              minValue: (paceMinPerKm - tolerance).clamp(0.0, double.infinity),
+              maxValue: paceMinPerKm + tolerance,
+              enabled: true,
+              speakCurrentValue: true,
+              okIntervalSeconds: 60,
+              outOfRangeDelaySeconds: 10,
+              notifyOnReturn: true,
+            ));
+            if (step.duration.inSeconds >= 60 && !stepAlerts.any((a) => a.metric == AlertMetric.pace && a.id == '${step.id}_periodic_pace')) {
+              stepAlerts.add(AlertConfig(
+                id: '${step.id}_periodic_pace',
+                name: 'Ritmo',
+                metric: AlertMetric.pace,
+                mode: AlertMode.current,
+                trigger: AlertTrigger.time,
+                intervalSeconds: step.duration.inSeconds >= 180 ? 60 : 30,
+                enabled: true,
+              ));
+            }
+          } else if (step.target.metric == TargetMetric.heartRateZone && 
+                     step.target.targetHrZoneMin != null && 
+                     step.target.targetHrZoneMax != null) {
+            coachingAlerts.add(CoachingAlert(
+              id: '${step.id}_hrzone',
+              name: 'Zona FC controllata',
+              metric: AlertMetric.hrZone,
+              minValue: step.target.targetHrZoneMin!.toDouble(),
+              maxValue: step.target.targetHrZoneMax!.toDouble(),
+              enabled: true,
+              speakCurrentValue: false,
             ));
           }
-        } else if (step.target.metric == TargetMetric.heartRateZone && 
-                   step.target.targetHrZoneMin != null && 
-                   step.target.targetHrZoneMax != null) {
-          coachingAlerts.add(CoachingAlert(
-            id: '${step.id}_hrzone',
-            name: 'Zona FC controllata',
-            metric: AlertMetric.hrZone,
-            minValue: step.target.targetHrZoneMin!.toDouble(),
-            maxValue: step.target.targetHrZoneMax!.toDouble(),
-            enabled: true,
-            speakCurrentValue: false,
-          ));
         }
 
         intervals.add(IntervalStep(
@@ -523,9 +753,9 @@ class WorkoutPlan {
       id: id,
       name: name,
       description: description,
-      isIntervalTraining: isIntervals,
+      isIntervalTraining: true, // ALWAYS set to true for consistent interval training
       intervals: intervals,
-      alerts: globalAlerts,
+      alerts: presetGlobalAlerts,
       announceStart: announceStart,
       announceEnd: announceEnd,
       announceSummary: announceSplits,
@@ -579,6 +809,8 @@ class WorkoutPlan {
               ? WorkoutDuration(type: 'time_seconds', value: i.durationSeconds.toDouble())
               : WorkoutDuration(type: 'distance_meters', value: i.distanceMeters),
           target: target,
+          periodicAlerts: i.alerts,
+          coachingAlerts: i.coachingAlerts,
         ));
       }
     } else {
@@ -600,6 +832,7 @@ class WorkoutPlan {
       announceStart: preset.announceStart,
       announceSplits: preset.announceSummary,
       announceEnd: preset.announceEnd,
+      globalAlerts: preset.alerts,
       steps: steps,
     );
   }

@@ -8,7 +8,6 @@ import '../models/alert_config.dart';
 import '../widgets/alert_card.dart';
 import '../widgets/coaching_alert_card.dart';
 import '../widgets/neumorphic_card.dart';
-import '../widgets/neumorphic_segmented_control.dart';
 import '../widgets/neumorphic_switch.dart';
 import '../widgets/alert_setup_sheet.dart';
 import '../widgets/ai_workout_sheet.dart';
@@ -91,7 +90,7 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
                 preset.intervals = newPreset.intervals;
                 preset.alerts = newPreset.alerts;
                 preset.coachingAlerts = newPreset.coachingAlerts;
-                preset.isIntervalTraining = newPreset.isIntervalTraining;
+                preset.isIntervalTraining = true;
                 await presetProvider.updatePreset(preset);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -151,38 +150,6 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
 
             const SizedBox(height: 28),
 
-            // Mode Selection (ISO 9241 Ergonomic Segmented Control)
-            const Text(
-              'STRUTTURA ALLENAMENTO',
-              style: TextStyle(
-                color: AppColors.textMuted,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.2,
-              ),
-            ),
-            const SizedBox(height: 10),
-            NeumorphicSegmentedControl<bool>(
-              value: preset.isIntervalTraining,
-              minHeight: 52,
-              onChanged: (isIntervals) {
-                preset.isIntervalTraining = isIntervals;
-                presetProvider.updatePreset(preset);
-              },
-              segments: const [
-                NeumorphicSegment<bool>(
-                  value: false,
-                  label: 'Corsa Continua',
-                  icon: Icons.directions_run,
-                ),
-                NeumorphicSegment<bool>(
-                  value: true,
-                  label: 'Ripetute & Fasi',
-                  icon: Icons.repeat,
-                ),
-              ],
-            ),
-
             const SizedBox(height: 28),
 
             // Voice settings
@@ -235,130 +202,9 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
 
             const SizedBox(height: 28),
 
-            if (preset.isIntervalTraining) ...[
-              _buildIntervalsSection(context, presetProvider, preset),
-            ] else ...[
-              // Standard Alerts section
-              Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'AVVISI PERIODICI',
-                      style: TextStyle(
-                        color: AppColors.textMuted,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                  ),
-                  TextButton.icon(
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Aggiungi'),
-                    onPressed: () => _showAddAlertSheet(
-                      context,
-                      presetProvider,
-                      preset.id,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-
-              if (preset.alerts.isEmpty)
-                _buildEmptyState(
-                  'Nessun avviso periodico',
-                  () => _showAddAlertSheet(
-                    context,
-                    presetProvider,
-                    preset.id,
-                  ),
-                )
-              else
-                ...preset.alerts.map(
-                  (alert) => AlertCard(
-                    alert: alert,
-                    onEdit: () => _showEditAlertSheet(
-                      context,
-                      presetProvider,
-                      preset.id,
-                      alert,
-                    ),
-                    onToggle: (enabled) {
-                      presetProvider.updateAlertInPreset(
-                        preset.id,
-                        alert.copyWith(enabled: enabled),
-                      );
-                    },
-                    onDelete: () {
-                      presetProvider.removeAlertFromPreset(preset.id, alert.id);
-                    },
-                  ),
-                ),
-
-              const SizedBox(height: 28),
-
-              // Coaching Alerts section
-              Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'AVVISI DI COACHING',
-                      style: TextStyle(
-                        color: AppColors.textMuted,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                  ),
-                  TextButton.icon(
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Aggiungi'),
-                    onPressed: () => _showAddCoachingSheet(
-                      context,
-                      presetProvider,
-                      preset.id,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-
-              if (preset.coachingAlerts.isEmpty)
-                _buildEmptyState(
-                  'Nessun avviso di coaching',
-                  () => _showAddCoachingSheet(
-                    context,
-                    presetProvider,
-                    preset.id,
-                  ),
-                )
-              else
-                ...preset.coachingAlerts.map(
-                  (alert) => CoachingAlertCard(
-                    alert: alert,
-                    onEdit: () => _showEditCoachingSheet(
-                      context,
-                      presetProvider,
-                      preset.id,
-                      alert,
-                    ),
-                    onToggle: (enabled) {
-                      presetProvider.updateCoachingAlertInPreset(
-                        preset.id,
-                        alert.copyWith(enabled: enabled),
-                      );
-                    },
-                    onDelete: () {
-                      presetProvider.removeCoachingAlertFromPreset(
-                        preset.id,
-                        alert.id,
-                      );
-                    },
-                  ),
-                ),
-            ],
+            _buildIntervalsSection(context, presetProvider, preset),
+            const SizedBox(height: 28),
+            _buildPresetAlertsSection(context, presetProvider, preset),
 
             // Test audio button
             const SizedBox(height: 40),
@@ -385,6 +231,99 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildPresetAlertsSection(
+    BuildContext context,
+    PresetProvider provider,
+    Preset preset,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'AVVISI GLOBALI DELL\'ALLENAMENTO',
+                style: TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1,
+                ),
+              ),
+            ),
+            TextButton.icon(
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Aggiungi'),
+              onPressed: () => _showAddAlertSheet(context, provider, preset.id),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (preset.alerts.isEmpty)
+          _buildEmptyState(
+            'Nessun avviso periodico',
+            () => _showAddAlertSheet(context, provider, preset.id),
+          )
+        else
+          ...preset.alerts.map((alert) => AlertCard(
+                alert: alert,
+                onEdit: () => _showEditAlertSheet(context, provider, preset.id, alert),
+                onToggle: (enabled) {
+                  provider.updateAlertInPreset(
+                    preset.id,
+                    alert.copyWith(enabled: enabled),
+                  );
+                },
+                onDelete: () {
+                  provider.removeAlertFromPreset(preset.id, alert.id);
+                },
+              )),
+        const SizedBox(height: 28),
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'AVVISI DI COACHING',
+                style: TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1,
+                ),
+              ),
+            ),
+            TextButton.icon(
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Aggiungi'),
+              onPressed: () => _showAddCoachingSheet(context, provider, preset.id),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (preset.coachingAlerts.isEmpty)
+          _buildEmptyState(
+            'Nessun avviso di coaching',
+            () => _showAddCoachingSheet(context, provider, preset.id),
+          )
+        else
+          ...preset.coachingAlerts.map((alert) => CoachingAlertCard(
+                alert: alert,
+                onEdit: () => _showEditCoachingSheet(context, provider, preset.id, alert),
+                onToggle: (enabled) {
+                  provider.updateCoachingAlertInPreset(
+                    preset.id,
+                    alert.copyWith(enabled: enabled),
+                  );
+                },
+                onDelete: () {
+                  provider.removeCoachingAlertFromPreset(preset.id, alert.id);
+                },
+              )),
+      ],
     );
   }
 
@@ -538,7 +477,7 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
               ),
               const SizedBox(width: 6),
               Text(
-                'Durata: ${step.displayDuration}',
+                'Durata: ${_formatStepDuration(step)}',
                 style: const TextStyle(
                   color: AppColors.textSecondary,
                   fontSize: 13,
@@ -746,7 +685,7 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
                         keyboardType: TextInputType.number,
                         decoration: InputDecoration(
                           labelText: isDistance ? 'Valore distanza' : 'Valore tempo',
-                          suffixText: isDistance ? 'm' : 'sec',
+                          suffixText: isDistance ? 'm' : 'min:sec (es. 2:30)',
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -754,15 +693,11 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
                         spacing: 8,
                         runSpacing: 8,
                         children: (isDistance
-                                ? ['200', '400', '800', '1000', '2000', '5000']
-                                : ['30', '60', '90', '120', '180', '300'])
+                            ? ['200', '400', '800', '1000', '2000', '5000']
+                            : ['0:30', '1:00', '2:00', '2:30', '3:00', '4:00', '5:00', '10:00'])
                             .map((value) => ActionChip(
                                   label: Text(
-                                    isDistance
-                                        ? '$value m'
-                                        : value == '120' || value == '180' || value == '300'
-                                            ? '${(int.parse(value) / 60).round()}m'
-                                            : '${value}s',
+                                    isDistance ? '$value m' : value,
                                   ),
                                   onPressed: () => setSheetState(() => valueController.text = value),
                                 ))
@@ -775,7 +710,7 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
                         child: ElevatedButton(
                           onPressed: () async {
                             final name = nameController.text.trim();
-                            final parsed = int.tryParse(valueController.text.trim()) ?? 0;
+                            final parsed = _parseDurationInput(valueController.text.trim());
                             if (name.isEmpty || parsed <= 0) return;
                             if (existing == null) {
                               final newStep = IntervalStep(
@@ -807,6 +742,32 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
         );
       },
     );
+  }
+
+  int _parseDurationInput(String input) {
+    final trimmed = input.trim();
+    if (trimmed.contains(':')) {
+      final parts = trimmed.split(':');
+      if (parts.length == 2) {
+        final minutes = int.tryParse(parts[0].trim()) ?? -1;
+        final seconds = int.tryParse(parts[1].trim()) ?? -1;
+        if (minutes >= 0 && seconds >= 0 && seconds < 60) {
+          return minutes * 60 + seconds;
+        }
+      }
+    }
+    return int.tryParse(trimmed) ?? 0;
+  }
+
+  String _formatStepDuration(IntervalStep step) {
+    if (step.type == AlertTrigger.time) {
+      final totalSeconds = step.durationSeconds;
+      final minutes = totalSeconds ~/ 60;
+      final seconds = totalSeconds % 60;
+      if (minutes > 0) return '$minutes min $seconds s';
+      return '$seconds s';
+    }
+    return step.displayDuration;
   }
   Widget _buildEmptyState(String message, VoidCallback onAdd) {
     return Container(
@@ -992,7 +953,7 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
                   final convertedPreset = newPlan.toPreset();
                   preset.name = convertedPreset.name;
                   preset.description = convertedPreset.description;
-                  preset.isIntervalTraining = convertedPreset.isIntervalTraining;
+                  preset.isIntervalTraining = true;
                   preset.intervals = convertedPreset.intervals;
                   preset.announceStart = convertedPreset.announceStart;
                   preset.announceEnd = convertedPreset.announceEnd;

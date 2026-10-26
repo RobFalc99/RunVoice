@@ -128,6 +128,16 @@ Sei un coach di corsa esperto. Genera un piano di allenamento valido in formato 
   "announce_start": true,
   "announce_splits": true,
   "announce_end": true,
+  "global_alerts": [
+    {
+      "name": "Distanza ogni chilometro",
+      "metric": "distance" | "time" | "bpm" | "pace",
+      "trigger": "time" | "distance",
+      "interval_seconds": null,
+      "interval_meters": 1000,
+      "mode": "total" | "current" | "split"
+    }
+  ],
   "steps": [
     {
       "id": "step_1",
@@ -145,20 +155,83 @@ Sei un coach di corsa esperto. Genera un piano di allenamento valido in formato 
         "bpm_tolerance": 8,
         "target_pace_sec_per_km": 300,
         "pace_tolerance_sec": 10
-      }
+      },
+      "periodic_alerts": [
+        {
+          "name": "Distanza ogni 5 minuti",
+          "metric": "distance" | "time" | "bpm" | "pace",
+          "trigger": "time" | "distance",
+          "interval_seconds": 300,
+          "interval_meters": null,
+          "mode": "total" | "current" | "split"
+        }
+      ],
+      "coaching_alerts": [
+        {
+          "name": "Battiti 120-135",
+          "metric": "bpm" | "pace",
+          "min_value": 120.0,
+          "max_value": 135.0
+        }
+      ]
     }
   ]
 }
 
-REGOLE FONDAMENTALI SUI TARGET CARDIO E PASSO:
-1. Se il testo contiene indicazioni di battito cardiaco o BPM (es. '120-135 bpm', '145-155 bpm', 'sotto 140 bpm'):
-   - Imposta SEMPRE `metric: "heart_rate_bpm"` per ciascuna fase interessata.
+REGOLE FONDAMENTALI GLOBALI:
+1. SEMPRE produci almeno 1 step, anche per allenamenti continui (es. "Corsa continua").
+2. GLOBAL_ALERTS vs PERIODIC_ALERTS vs COACHING_ALERTS:
+   - Usa global_alerts per annunci che si applicano durante TUTTO l'allenamento e non sono collegati alle ripetute (es. 'ogni chilometro dimmi la distanza complessiva', 'durante tutto l'allenamento ogni X minuti dimmi il tempo').
+   - Usa periodic_alerts (dentro ogni step) per annunci periodici legati SOLO a quella fase/step (es. 'ogni 5 minuti di questa ripetuta dimmi la distanza', 'ogni chilometro durante il lavoro').
+   - Usa coaching_alerts (dentro ogni step) per monitorare range di metriche durante quella fase (es. 'mantieni i battiti tra 120 e 135', 'battiti sopra 140', 'ritmo tra 4:30 e 5:00').
+3. Se l'utente chiede "ogni X minuti dimmi la distanza complessiva" → global_alerts: trigger: "time", interval_seconds: X*60, metric: "distance", mode: "total".
+4. Se l'utente chiede "ogni X minuti dimmi la distanza di questa ripetuta" → periodic_alerts dello step: trigger: "time", interval_seconds: X*60, metric: "distance", mode: "total" o "current".
+5. IMPORTANTE: Non saltare NESSUN alert menzonato dall'utente, né in global_alerts né in periodic_alerts né in coaching_alerts.
+
+REGOLE SUI GLOBAL_ALERTS:
+1. Usa global_alerts per annunci che durano "durante tutto l'allenamento" o "non collegati alle ripetute".
+2. Esempi:
+   - "Ogni chilometro dimmi la distanza complessiva" → global_alerts: [{ name: "Distanza complessiva", metric: "distance", trigger: "distance", interval_meters: 1000, mode: "total" }]
+   - "Ogni 5 minuti dimmi il tempo totale" → global_alerts: [{ name: "Tempo totale", metric: "time", trigger: "time", interval_seconds: 300, mode: "total" }]
+   - "Non collegato alle ripetute, dimmi ogni 2 km la distanza" → global_alerts: [{ name: "Distanza", metric: "distance", trigger: "distance", interval_meters: 2000, mode: "total" }]
+3. Se non ci sono annunci globali, global_alerts può essere [] o omesso.
+
+REGOLE SUI TARGET CARDIO E PASSO (steps):
+1. Se il testo contiene indicazioni di battito cardiaco o BPM (es. '120-135 bpm', '145-155 bpm', 'sotto 140 bpm', 'battiti tra 120 e 135'):
+   - Imposta SEMPRE `metric: "heart_rate_bpm"` per ciascuna fase interessata nel target.
    - Imposta `target_hr_bpm_min` e `target_hr_bpm_max` con gli estremi del range (es. 120 e 135).
    - Calcola anche il centro `target_hr_bpm` e la semi-tolleranza `bpm_tolerance`.
+   - SEMPRE includi anche un coaching_alert in quello step con { name, metric: "bpm", min_value, max_value }.
 2. Se il testo contiene indicazioni di passo/ritmo (es. '4:30/km', '5 min/km'):
    - Imposta `metric: "pace"` con `target_pace_sec_per_km` in secondi (es. 270 per 4:30) e `pace_tolerance_sec: 10`.
+   - Se pertinente, aggiungi un coaching_alert per il passo.
 3. Riconosci le ripetizioni ('8x(2'+2')') espandendole in sequenze alternate di step di lavoro ('work') e recupero ('recovery') con i rispettivi target cardio/passo.
-4. Restituisci ESCLUSIVAMENTE l'oggetto JSON, senza markdown né testo aggiuntivo.
+
+REGOLE COACHING_ALERTS (dentro steps):
+1. Usa coaching_alerts per monitorare range di metriche durante uno step (es. 'battiti tra 120 e 135', 'battiti sopra 140', 'battiti fino a 155', 'ritmo tra 4:30 e 5:00').
+2. Formato: { name: string, metric: "bpm" | "pace", min_value: double?, max_value: double? }
+   - Se "battiti sopra 140" → metric: "bpm", min_value: 140, max_value: 180 (valore ragionevole).
+   - Se "battiti tra 120 e 135" → metric: "bpm", min_value: 120, max_value: 135.
+   - Se "battiti fino a 120" → metric: "bpm", min_value: 50, max_value: 120 (valore ragionevole minimo).
+   - Se "ritmo tra 4:30 e 5:00" → metric: "pace", min_value: 270 (secondi per km), max_value: 300.
+   - Se "ritmo sopra 6 minuti per km" → metric: "pace", min_value: 360, max_value: 1200 (valore ragionevole massimo).
+3. IMPORTANTE: Tutti i coaching_alerts menzonati devono SEMPRE essere inclusi nello step corrispondente. Non saltare mai un coaching alert richiesto dall'utente.
+4. Se uno step ha target con range HR/Pace, DEVE avere anche il corrispondente coaching_alert.
+
+REGOLE PERIODIC_ALERTS (dentro steps):
+1. Usa periodic_alerts per annunci periodici che avvengono DURANTE uno step specifico.
+2. Se l'utente dice "ogni 5 minuti dimmi la distanza" durante uno step → trigger: "time", interval_seconds: 300, metric: "distance", mode: "total" (o "current" se è distanza dello step attuale).
+3. Se l'utente dice "ogni chilometro dimmi il ritmo di questa ripetuta" → trigger: "distance", interval_meters: 1000, metric: "pace", mode: "current".
+4. Se l'utente dice "ogni 500 metri dimmi il tempo trascorso dello step" → trigger: "distance", interval_meters: 500, metric: "time", mode: "current".
+5. Formato: { name: string, metric: "distance" | "time" | "bpm" | "pace", trigger: "time" | "distance", interval_seconds?: int, interval_meters?: double, mode: "total" | "current" | "split" }
+6. IMPORTANTE: Non saltare nessun periodic alert menzonato per quella fase. Se l'utente chiede annunci periodici per uno step, DEVONO essere inclusi.
+
+REGOLE FINALI:
+1. Restituisci ESCLUSIVAMENTE l'oggetto JSON, senza markdown né testo aggiuntivo.
+2. Se global_alerts è vuoto, può essere omesso o un array vuoto [].
+3. Se uno step non ha periodic_alerts, può essere omesso o array vuoto []. Stessa cosa per coaching_alerts.
+4. Per allenamenti continui senza ripetizioni, crea 1 step con phase: "work" e duration in base al contesto (default 5 km se non specificato).
+5. Ogni step DEVE avere almeno: id, label, phase, duration. Il target, periodic_alerts e coaching_alerts sono opzionali se non specificati.
 ''';
 
     final response = await http.post(

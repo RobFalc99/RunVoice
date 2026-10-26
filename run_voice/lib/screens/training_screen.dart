@@ -32,6 +32,8 @@ class _TrainingScreenState extends State<TrainingScreen>
     with TickerProviderStateMixin {
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
+  final ScrollController _phaseScrollController = ScrollController();
+  int _lastIntervalIndex = 0;
 
   @override
   void initState() {
@@ -48,6 +50,7 @@ class _TrainingScreenState extends State<TrainingScreen>
   @override
   void dispose() {
     _pulseController.dispose();
+    _phaseScrollController.dispose();
     super.dispose();
   }
 
@@ -673,6 +676,19 @@ class _TrainingScreenState extends State<TrainingScreen>
 
     final currentIndex = wp.currentIntervalIndex;
     final totalSteps = preset.intervals.length;
+
+    if (currentIndex != _lastIntervalIndex) {
+      _lastIntervalIndex = currentIndex;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_phaseScrollController.hasClients) {
+          _phaseScrollController.animateTo(
+            currentIndex * 150.0,
+            duration: const Duration(milliseconds: 350),
+            curve: Curves.easeInOutCubic,
+          );
+        }
+      });
+    }
     
     if (currentIndex >= totalSteps) {
       return Container(
@@ -816,6 +832,7 @@ class _TrainingScreenState extends State<TrainingScreen>
           SizedBox(
             height: 75,
             child: ListView.builder(
+              controller: _phaseScrollController,
               scrollDirection: Axis.horizontal,
               itemCount: totalSteps,
               itemBuilder: (context, index) {

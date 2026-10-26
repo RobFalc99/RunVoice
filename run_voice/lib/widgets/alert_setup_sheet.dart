@@ -180,6 +180,16 @@ class _AlertSetupSheetState extends State<AlertSetupSheet> {
   late int _calculationWindowSeconds;
   late bool _speakValueEvenWhenOk;
 
+  String _formatTimeValue(num value) {
+    final seconds = value.round();
+    if (seconds < 60) return '$seconds s';
+
+    final minutes = seconds ~/ 60;
+    final remainder = seconds % 60;
+    if (remainder == 0) return '$minutes min';
+    return '$minutes min ${remainder.toString().padLeft(2, '0')} s';
+  }
+
   // Metrica ammessa per il coaching: solo quelle che hanno senso
   // confrontate in un range (no *distance* e *time*, che sono valori
   // progressivi/cumulativi, non "istantanei"). `AlertMetric.hrZone`
@@ -906,13 +916,7 @@ class _AlertSetupSheetState extends State<AlertSetupSheet> {
             onChanged: (v) => setState(() {
               _intervalSeconds = v.round();
             }),
-            formatValue: (v) {
-              if (v >= 60 && v % 60 == 0) {
-                final m = (v / 60).round();
-                return '$m min';
-              }
-              return '${v.round()} s';
-            },
+            formatValue: _formatTimeValue,
           ),
           const SizedBox(height: 14),
         ],
@@ -961,12 +965,8 @@ class _AlertSetupSheetState extends State<AlertSetupSheet> {
                   return '${(v / 1000).toStringAsFixed(1)} km';
                 }
                 return '${v.round()} m';
-              } else {
-                if (v >= 60 && v % 60 == 0) {
-                  return '${(v / 60).round()} min';
-                }
-                return '${v.round()} s';
               }
+              return _formatTimeValue(v);
             },
           ),
           const SizedBox(height: 14),
@@ -1078,15 +1078,7 @@ class _AlertSetupSheetState extends State<AlertSetupSheet> {
             unit: 's',
             onChanged: (v) =>
                 setState(() => _calculationWindowSeconds = v.round()),
-            formatValue: (v) {
-              if (v >= 60) {
-                final m = (v ~/ 60);
-                final s = (v.round() % 60);
-                if (s == 0) return '$m min';
-                return '$m:$s';
-              }
-              return '${v.round()} s';
-            },
+            formatValue: _formatTimeValue,
           ),
           const SizedBox(height: 12),
         ],
