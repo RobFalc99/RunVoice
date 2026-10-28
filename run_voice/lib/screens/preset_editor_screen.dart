@@ -171,11 +171,29 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
               child: Column(
                 children: [
                   NeumorphicSwitchListTile(
-                    title: 'Inizio/Fine allenamento',
+                    title: 'Avviso inizio allenamento',
+                    subtitle: 'Notifica vocale all\'avvio della sessione',
                     value: preset.announceStart,
                     onChanged: (v) {
-                      preset.announceStart = v;
-                      preset.announceEnd = v;
+                      setState(() {
+                        preset.announceStart = v;
+                      });
+                      presetProvider.updatePreset(preset);
+                    },
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                  ),
+                  Divider(color: AppColors.surfaceHighlight, height: 1),
+                  NeumorphicSwitchListTile(
+                    title: 'Avviso fine allenamento',
+                    subtitle: 'Notifica vocale al termine della sessione o ripetute',
+                    value: preset.announceEnd,
+                    onChanged: (v) {
+                      setState(() {
+                        preset.announceEnd = v;
+                      });
                       presetProvider.updatePreset(preset);
                     },
                     padding: const EdgeInsets.symmetric(
@@ -186,9 +204,12 @@ class _PresetEditorScreenState extends State<PresetEditorScreen> {
                   Divider(color: AppColors.surfaceHighlight, height: 1),
                   NeumorphicSwitchListTile(
                     title: 'Sommario finale',
+                    subtitle: 'Riepilogo vocale di tempo e distanza percorsa',
                     value: preset.announceSummary,
                     onChanged: (v) {
-                      preset.announceSummary = v;
+                      setState(() {
+                        preset.announceSummary = v;
+                      });
                       presetProvider.updatePreset(preset);
                     },
                     padding: const EdgeInsets.symmetric(

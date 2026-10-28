@@ -54,6 +54,7 @@ class _AiWorkoutSheetState extends State<AiWorkoutSheet> {
   bool _isLoading = false;
   String? _errorMessage;
   WorkoutPlan? _generatedPlan;
+  bool _showAllSteps = false;
 
   final List<String> _quickPrompts = const [
     '5x1000m a 4:30 con 2 min recupero',
@@ -95,6 +96,7 @@ class _AiWorkoutSheetState extends State<AiWorkoutSheet> {
       setState(() {
         _isLoading = false;
         _generatedPlan = plan;
+        _showAllSteps = false;
       });
     } catch (e) {
       if (!mounted) return;
@@ -449,127 +451,104 @@ class _AiWorkoutSheetState extends State<AiWorkoutSheet> {
             ),
             const SizedBox(height: 10),
           ],
-          const Text(
-            "FASI DELL'ALLENAMENTO:",
-            style: TextStyle(
-              color: AppColors.textMuted,
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.5,
-            ),
-          ),
-          const SizedBox(height: 8),
-          ...plan.steps.take(6).map(
-                (step) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 3),
-                  child: Row(
-                    children: [
-                      Icon(
-                        step.phase.name == 'warmup'
-                            ? Icons.wb_sunny
-                            : (step.phase.name == 'cooldown'
-                                ? Icons.nightlight_round
-                                : Icons.directions_run),
-                        size: 14,
-                        color: step.phase.name == 'warmup'
-                            ? Colors.orange
-                            : (step.phase.name == 'cooldown'
-                                ? Colors.blue
-                                : AppColors.primary),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          step.label,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                "FASI DELL'ALLENAMENTO:",
+                style: TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              if (plan.steps.length > 6)
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _showAllSteps = !_showAllSteps;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _showAllSteps ? 'Mostra meno' : 'Mostra tutto (${plan.steps.length})',
                           style: const TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 13,
+                            color: AppColors.primary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            step.duration.displayString,
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          if (step.target.metric != TargetMetric.none) ...[
-                            const SizedBox(height: 4),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.surfaceHighlight
-                                    .withValues(alpha: 0.35),
-                                borderRadius: BorderRadius.circular(999),
-                                border: Border.all(
-                                  color: AppColors.surfaceHighlight
-                                      .withValues(alpha: 0.5),
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    step.target.metric == TargetMetric.heartRateBpm
-                                        ? Icons.favorite
-                                        : Icons.speed,
-                                    size: 12,
-                                    color: step.target.metric ==
-                                            TargetMetric.heartRateBpm
-                                        ? AppColors.error
-                                        : AppColors.primary,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    step.target.metric ==
-                                            TargetMetric.heartRateBpm
-                                        ? (step.target.displayHeartRate != '--'
-                                            ? step.target.displayHeartRate
-                                            : ((step.target.targetHrBpmMin != null &&
-                                                    step.target.targetHrBpmMax !=
-                                                        null)
-                                                ? '${step.target.targetHrBpmMin}-${step.target.targetHrBpmMax} bpm'
-                                                : '--'))
-                                        : step.target.displayPace,
-                                    style: TextStyle(
-                                      color: step.target.metric ==
-                                              TargetMetric.heartRateBpm
-                                          ? AppColors.error
-                                          : AppColors.primary,
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ],
+                        const SizedBox(width: 4),
+                        Icon(
+                          _showAllSteps ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                          size: 14,
+                          color: AppColors.primary,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (_showAllSteps) ...[
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 280),
+              child: Scrollbar(
+                thumbVisibility: true,
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: plan.steps.map(_buildStepRow).toList(),
                   ),
                 ),
               ),
-          if (plan.steps.length > 6) ...[
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                '+ altre ${plan.steps.length - 6} fasi...',
-                style: const TextStyle(
-                  color: AppColors.textMuted,
-                  fontSize: 12,
-                  fontStyle: FontStyle.italic,
+            ),
+          ] else ...[
+            ...plan.steps.take(6).map(_buildStepRow),
+            if (plan.steps.length > 6) ...[
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: InkWell(
+                  onTap: () {
+                    setState(() {
+                      _showAllSteps = true;
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Mostra altro (+${plan.steps.length - 6} fasi)',
+                          style: const TextStyle(
+                            color: AppColors.primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.keyboard_arrow_down,
+                          size: 16,
+                          color: AppColors.primary,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           ],
           const SizedBox(height: 16),
           if (widget.onTheFly) ...[
@@ -652,6 +631,100 @@ class _AiWorkoutSheetState extends State<AiWorkoutSheet> {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepRow(WorkoutStep step) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          Icon(
+            step.phase.name == 'warmup'
+                ? Icons.wb_sunny
+                : (step.phase.name == 'cooldown'
+                    ? Icons.nightlight_round
+                    : Icons.directions_run),
+            size: 14,
+            color: step.phase.name == 'warmup'
+                ? Colors.orange
+                : (step.phase.name == 'cooldown'
+                    ? Colors.blue
+                    : AppColors.primary),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              step.label,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 13,
+              ),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                step.duration.displayString,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (step.target.metric != TargetMetric.none) ...[
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceHighlight.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: AppColors.surfaceHighlight.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        step.target.metric == TargetMetric.heartRateBpm
+                            ? Icons.favorite
+                            : Icons.speed,
+                        size: 12,
+                        color: step.target.metric == TargetMetric.heartRateBpm
+                            ? AppColors.error
+                            : AppColors.primary,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        step.target.metric == TargetMetric.heartRateBpm
+                            ? (step.target.displayHeartRate != '--'
+                                ? step.target.displayHeartRate
+                                : ((step.target.targetHrBpmMin != null &&
+                                        step.target.targetHrBpmMax != null)
+                                    ? '${step.target.targetHrBpmMin}-${step.target.targetHrBpmMax} bpm'
+                                    : '--'))
+                            : step.target.displayPace,
+                        style: TextStyle(
+                          color: step.target.metric == TargetMetric.heartRateBpm
+                              ? AppColors.error
+                              : AppColors.primary,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
         ],
       ),
     );

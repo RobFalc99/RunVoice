@@ -251,7 +251,9 @@ class WorkoutService {
         _currentIntervalStartTime = _elapsedTime;
         _setupIntervalSpecificAlerts();
       } else {
-        _ttsService.enqueue('Tutte le ripetute sono state completate.');
+        if (_activePreset?.announceEnd ?? true) {
+          _ttsService.enqueue('Tutte le ripetute sono state completate.');
+        }
         _cleanupIntervalSpecificAlerts();
       }
     }
@@ -488,12 +490,22 @@ class WorkoutService {
     // Stop tracking
     _locationService.stopTracking();
 
-    // Announce end
-    final totalTime = _formatDuration(_elapsedTime);
-    _ttsService.enqueue(
-      'Allenamento terminato. Tempo totale: $totalTime. '
-      'Distanza: ${_distanceKm.toStringAsFixed(2)} chilometri.',
-    );
+    // Announce end & summary according to preset configuration
+    final announceEnd = _activePreset?.announceEnd ?? true;
+    final announceSummary = _activePreset?.announceSummary ?? true;
+
+    if (announceEnd || announceSummary) {
+      final parts = <String>[];
+      if (announceEnd) {
+        parts.add('Allenamento terminato.');
+      }
+      if (announceSummary) {
+        final totalTime = _formatDuration(_elapsedTime);
+        parts.add('Tempo totale: $totalTime.');
+        parts.add('Distanza: ${_distanceKm.toStringAsFixed(2)} chilometri.');
+      }
+      _ttsService.enqueue(parts.join(' '));
+    }
 
     _state = WorkoutState.idle;
     onStateChanged?.call(_state);

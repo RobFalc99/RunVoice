@@ -600,9 +600,14 @@ class WorkoutPlan {
       orElse: () => WorkoutStructure.continuous,
     );
 
+    final rawId = json['id'] as String?;
+    final resolvedId = (rawId == null || rawId.isEmpty || rawId == 'workout_custom')
+        ? 'workout_${DateTime.now().microsecondsSinceEpoch}'
+        : rawId;
+
     return WorkoutPlan(
       version: json['version'] as String? ?? '1.0',
-      id: json['id'] as String? ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      id: resolvedId,
       name: json['name'] as String? ?? 'Nuovo Allenamento',
       description: json['description'] as String? ?? '',
       structure: structure,

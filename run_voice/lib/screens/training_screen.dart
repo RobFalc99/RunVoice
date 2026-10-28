@@ -312,7 +312,10 @@ class _TrainingScreenState extends State<TrainingScreen>
       child: Column(
         children: [
           DropdownButtonFormField<String>(
-            initialValue: presetProvider.selectedPresetId,
+            key: ValueKey(presetProvider.selectedPresetId),
+            initialValue: (presetProvider.presets.any((p) => p.id == presetProvider.selectedPresetId))
+                ? presetProvider.selectedPresetId
+                : (presetProvider.presets.isNotEmpty ? presetProvider.presets.first.id : null),
             decoration: InputDecoration(
               prefixIcon: const Icon(
                 Icons.playlist_play,
@@ -330,15 +333,23 @@ class _TrainingScreenState extends State<TrainingScreen>
               ),
             ),
             dropdownColor: AppColors.surfaceLight,
-            items: presetProvider.presets.map((preset) {
-              return DropdownMenuItem(
-                value: preset.id,
-                child: Text(
-                  preset.name,
-                  style: const TextStyle(color: AppColors.textPrimary),
-                ),
-              );
-            }).toList(),
+            items: () {
+              final seen = <String>{};
+              final items = <DropdownMenuItem<String>>[];
+              for (final preset in presetProvider.presets) {
+                if (!seen.contains(preset.id)) {
+                  seen.add(preset.id);
+                  items.add(DropdownMenuItem(
+                    value: preset.id,
+                    child: Text(
+                      preset.name,
+                      style: const TextStyle(color: AppColors.textPrimary),
+                    ),
+                  ));
+                }
+              }
+              return items;
+            }(),
             onChanged: (id) {
               if (id != null) presetProvider.selectPreset(id);
             },

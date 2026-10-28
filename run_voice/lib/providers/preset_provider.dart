@@ -25,12 +25,28 @@ class PresetProvider extends ChangeNotifier {
       _presets = list
           .map((e) => Preset.fromJson(e as Map<String, dynamic>))
           .toList();
+
+      // Deduplicate IDs in case existing stored presets share an ID (e.g. legacy 'workout_custom')
+      final seenIds = <String>{};
+      bool hasDuplicates = false;
+      for (int i = 0; i < _presets.length; i++) {
+        if (_presets[i].id.isEmpty || seenIds.contains(_presets[i].id)) {
+          _presets[i] = _presets[i].copyWith(id: _uuid.v4());
+          hasDuplicates = true;
+        }
+        seenIds.add(_presets[i].id);
+      }
+      if (hasDuplicates) {
+        await _save();
+      }
     }
     _selectedPresetId = prefs.getString(_selectedKey);
 
     // Create a default preset if none exist
     if (_presets.isEmpty) {
       await _createDefaultPreset();
+    } else if (_selectedPresetId == null || !_presets.any((p) => p.id == _selectedPresetId)) {
+      _selectedPresetId = _presets.first.id;
     }
     notifyListeners();
   }
@@ -108,7 +124,11 @@ class PresetProvider extends ChangeNotifier {
   }
 
   Future<void> addPreset(Preset preset) async {
-    _presets.add(preset);
+    var finalPreset = preset;
+    if (_presets.any((p) => p.id == finalPreset.id)) {
+      finalPreset = finalPreset.copyWith(id: _uuid.v4());
+    }
+    _presets.add(finalPreset);
     await _save();
     notifyListeners();
   }
