@@ -1,3 +1,4 @@
+// ignore_for_file: avoid_print
 import 'dart:io';
 import 'package:run_voice/models/alert_config.dart';
 import 'package:run_voice/services/gemini_service.dart';

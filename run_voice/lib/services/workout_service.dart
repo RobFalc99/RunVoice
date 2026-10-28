@@ -168,14 +168,14 @@ class WorkoutService {
           heartRate: _currentHeartRate,
         ));
 
-        // ALWAYS evaluate the global coaching alerts (preset-level).
-        _evaluateCoachingAlerts();
-
         if (_activePreset?.isIntervalTraining == true) {
           // Additionally evaluate interval progression and step coaching alerts.
           _evaluateIntervals();
           _evaluateStepCoachingAlerts();
         }
+
+        // Evaluate global coaching alerts (preset-level).
+        _evaluateCoachingAlerts();
 
         onDataUpdated?.call();
       }
@@ -358,8 +358,21 @@ class WorkoutService {
   /// Evaluate coaching alerts every second
   void _evaluateCoachingAlerts() {
     if (_activePreset == null) return;
+
+    // During interval training, suppress global coaching alerts for metrics that are
+    // actively controlled by the current interval step.
+    final currentStep = (_activePreset!.isIntervalTraining &&
+            _currentIntervalIndex < _activePreset!.intervals.length)
+        ? _activePreset!.intervals[_currentIntervalIndex]
+        : null;
+
     for (var alert in _activePreset!.coachingAlerts) {
       if (!alert.enabled) continue;
+
+      if (currentStep != null &&
+          currentStep.coachingAlerts.any((ca) => ca.enabled && ca.metric == alert.metric)) {
+        continue;
+      }
 
       final value = _calculateWindowedValue(alert);
 
@@ -371,6 +384,7 @@ class WorkoutService {
 
       if (value >= alert.minValue && value <= alert.maxValue) {
         // In range
+        _coachingOutDuration[alert.id] = 0;
         _coachingOkDuration[alert.id] =
             (_coachingOkDuration[alert.id] ?? 0) + 1;
 
@@ -565,6 +579,12 @@ class WorkoutService {
     }
     _stepAlertTimers.clear();
     _stepAlertDistanceCheckpoints.clear();
+
+    // Reset coaching states so subsequent intervals or repeated phases
+    // start with a clean state and do not inherit stale out-of-range/in-range durations.
+    _coachingOutDuration.clear();
+    _coachingOkDuration.clear();
+    _coachingWasOut.clear();
   }
 
   void _checkStepDistanceAlerts() {
@@ -601,6 +621,8 @@ class WorkoutService {
       }
 
       if (value >= alert.minValue && value <= alert.maxValue) {
+        // In range
+        _coachingOutDuration[alert.id] = 0;
         _coachingOkDuration[alert.id] = (_coachingOkDuration[alert.id] ?? 0) + 1;
 
         final wasOut = _coachingWasOut[alert.id] ?? false;

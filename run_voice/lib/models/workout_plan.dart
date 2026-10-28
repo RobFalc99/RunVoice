@@ -136,12 +136,28 @@ class WorkoutCoachingPlan {
 
   /// Convert WorkoutCoachingPlan to CoachingAlert
   CoachingAlert toCoachingAlert(String idPrefix) {
+    final alertMetric = _toAlertMetric();
+    double minV = minValue ?? 0.0;
+    double maxV = maxValue ?? 200.0;
+
+    // Se la metrica è il passo (pace), converti i valori se espressi in secondi (> 30s)
+    if (alertMetric == AlertMetric.pace) {
+      if (minV > 30.0) {
+        minV = minV / 60.0;
+      }
+      if (maxV > 30.0) {
+        maxV = maxV / 60.0;
+      }
+      if (minValue == null) minV = 3.0; // 3:00 min/km
+      if (maxValue == null) maxV = 10.0; // 10:00 min/km
+    }
+
     return CoachingAlert(
       id: '${idPrefix}_${name.replaceAll(' ', '_').toLowerCase()}',
       name: name,
-      metric: _toAlertMetric(),
-      minValue: minValue ?? 0.0,
-      maxValue: maxValue ?? 200.0,
+      metric: alertMetric,
+      minValue: minV,
+      maxValue: maxV,
       enabled: true,
       speakCurrentValue: true,
       okIntervalSeconds: 60,
@@ -632,17 +648,18 @@ class WorkoutPlan {
       ));
     }
 
-    void flattenStep(WorkoutStep step, {int depth = 0}) {
+    void flattenStep(WorkoutStep step, {int depth = 0, int? repeatIndex}) {
       // Protezione contro nidificazione eccessiva (max 10 livelli)
       if (depth > 10) return;
 
       if (step.subSteps.isNotEmpty) {
         for (int r = 0; r < step.repeatCount; r++) {
           for (final sub in step.subSteps) {
-            flattenStep(sub, depth: depth + 1);
+            flattenStep(sub, depth: depth + 1, repeatIndex: r + 1);
           }
         }
       } else {
+        final stepId = repeatIndex != null ? '${step.id}_rep_$repeatIndex' : step.id;
         final coachingAlerts = <CoachingAlert>[];
         final stepAlerts = <AlertConfig>[];
         
@@ -651,7 +668,7 @@ class WorkoutPlan {
         
         // Convert step.periodicAlertPlans to AlertConfig
         for (final plan in step.periodicAlertPlans) {
-          stepAlerts.add(plan.toAlertConfig(step.id));
+          stepAlerts.add(plan.toAlertConfig(stepId));
         }
         
         // Map step.coachingAlerts to IntervalStep.coachingAlerts (DIRECTLY)
@@ -659,7 +676,7 @@ class WorkoutPlan {
         
         // Convert step.coachingAlertPlans to CoachingAlert
         for (final plan in step.coachingAlertPlans) {
-          coachingAlerts.add(plan.toCoachingAlert(step.id));
+          coachingAlerts.add(plan.toCoachingAlert(stepId));
         }
         
         // FALLBACK: Generate coaching_alerts from step.target if no explicit coaching alerts exist
@@ -668,7 +685,7 @@ class WorkoutPlan {
             final minB = (step.target.targetHrBpmMin ?? (step.target.targetHrBpm! - (step.target.bpmTolerance ?? 5))).toDouble().clamp(40.0, 240.0);
             final maxB = (step.target.targetHrBpmMax ?? (step.target.targetHrBpm! + (step.target.bpmTolerance ?? 5))).toDouble().clamp(40.0, 240.0);
             coachingAlerts.add(CoachingAlert(
-              id: '${step.id}_hr',
+              id: '${stepId}_hr',
               name: 'BPM ${minB.round()}-${maxB.round()}',
               metric: AlertMetric.bpm,
               minValue: minB,
@@ -679,9 +696,9 @@ class WorkoutPlan {
               outOfRangeDelaySeconds: 10,
               notifyOnReturn: true,
             ));
-            if (step.duration.inSeconds >= 60 && !stepAlerts.any((a) => a.metric == AlertMetric.bpm && a.id == '${step.id}_periodic_bpm')) {
+            if (step.duration.inSeconds >= 60 && !stepAlerts.any((a) => a.metric == AlertMetric.bpm && a.id == '${stepId}_periodic_bpm')) {
               stepAlerts.add(AlertConfig(
-                id: '${step.id}_periodic_bpm',
+                id: '${stepId}_periodic_bpm',
                 name: 'Battito cardiaco',
                 metric: AlertMetric.bpm,
                 mode: AlertMode.current,
@@ -696,7 +713,7 @@ class WorkoutPlan {
             final paceMinPerKm = step.target.targetPaceSecPerKm! / 60.0;
             final tolerance = (step.target.paceToleranceSec ?? 10) / 60.0;
             coachingAlerts.add(CoachingAlert(
-              id: '${step.id}_pace',
+              id: '${stepId}_pace',
               name: 'Ritmo controllato',
               metric: AlertMetric.pace,
               minValue: (paceMinPerKm - tolerance).clamp(0.0, double.infinity),
@@ -707,9 +724,9 @@ class WorkoutPlan {
               outOfRangeDelaySeconds: 10,
               notifyOnReturn: true,
             ));
-            if (step.duration.inSeconds >= 60 && !stepAlerts.any((a) => a.metric == AlertMetric.pace && a.id == '${step.id}_periodic_pace')) {
+            if (step.duration.inSeconds >= 60 && !stepAlerts.any((a) => a.metric == AlertMetric.pace && a.id == '${stepId}_periodic_pace')) {
               stepAlerts.add(AlertConfig(
-                id: '${step.id}_periodic_pace',
+                id: '${stepId}_periodic_pace',
                 name: 'Ritmo',
                 metric: AlertMetric.pace,
                 mode: AlertMode.current,
@@ -722,7 +739,7 @@ class WorkoutPlan {
                      step.target.targetHrZoneMin != null && 
                      step.target.targetHrZoneMax != null) {
             coachingAlerts.add(CoachingAlert(
-              id: '${step.id}_hrzone',
+              id: '${stepId}_hrzone',
               name: 'Zona FC controllata',
               metric: AlertMetric.hrZone,
               minValue: step.target.targetHrZoneMin!.toDouble(),
@@ -734,7 +751,7 @@ class WorkoutPlan {
         }
 
         intervals.add(IntervalStep(
-          id: step.id,
+          id: stepId,
           name: step.label,
           type: step.duration.isTime ? AlertTrigger.time : AlertTrigger.distance,
           durationSeconds: step.duration.inSeconds > 0 ? step.duration.inSeconds : 60,
