@@ -153,7 +153,95 @@ class _BluetoothDeviceDialogState extends State<BluetoothDeviceDialog> {
                       ],
                     ),
                   ),
-                const SizedBox(height: 16),
+                if (btProvider.savedDevices.isNotEmpty) ...[
+                  const Text(
+                    'DISPOSITIVI MEMORIZZATI',
+                    style: TextStyle(
+                      color: AppColors.textMuted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ...btProvider.savedDevices.map((device) {
+                    final isDiscovered =
+                        btProvider.isDeviceDiscovered(device.id);
+                    final isConnecting =
+                        btProvider.isDeviceConnecting(device.id);
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      decoration: BoxDecoration(
+                        color: isDiscovered
+                            ? AppColors.primary.withValues(alpha: 0.08)
+                            : AppColors.surfaceHighlight.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: ListTile(
+                        dense: true,
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 10),
+                        leading: Icon(
+                          Icons.bluetooth,
+                          color: isDiscovered
+                              ? AppColors.success
+                              : AppColors.primary,
+                        ),
+                        title: Text(
+                          device.name,
+                          style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Text(
+                          '${device.id}${isDiscovered ? ' • Nelle vicinanze' : ''}',
+                          style: TextStyle(
+                            color: isDiscovered
+                                ? AppColors.success
+                                : AppColors.textMuted,
+                            fontSize: 12,
+                          ),
+                        ),
+                        trailing: isConnecting
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 4,
+                                  ),
+                                  minimumSize: Size.zero,
+                                  elevation: 0,
+                                ),
+                                onPressed: () async {
+                                  final ok = await btProvider
+                                      .connectToSavedDevice(device);
+                                  if (ok && context.mounted) {
+                                    Navigator.of(context).pop();
+                                  }
+                                },
+                                child: const Text(
+                                  'Connetti',
+                                  style: TextStyle(fontSize: 12),
+                                ),
+                              ),
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: 12),
+                  const Divider(
+                    height: 20,
+                    color: AppColors.surfaceHighlight,
+                  ),
+                  const SizedBox(height: 4),
+                ],
+                const SizedBox(height: 8),
 
                 if (btProvider.scanResults.isNotEmpty)
                   SizedBox(

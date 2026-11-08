@@ -109,6 +109,18 @@ class HRBluetoothService {
     }
   }
 
+  /// Connect directly to a device using its MAC address / remoteId
+  Future<bool> connectToDeviceId(String deviceId) async {
+    try {
+      final device = BluetoothDevice.fromId(deviceId);
+      return await connectToDevice(device);
+    } catch (_) {
+      _isConnected = false;
+      onConnectionChanged?.call(false);
+      return false;
+    }
+  }
+
   /// Start monitoring HR from connected device
   Future<void> _startHeartRateMonitoring(BluetoothDevice device) async {
     final services = await device.discoverServices();

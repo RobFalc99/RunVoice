@@ -347,13 +347,14 @@ class CoachingAlert {
     required this.minValue,
     required this.maxValue,
     this.okIntervalSeconds = 120,
-    this.outOfRangeDelaySeconds = 10,
+    int? outOfRangeDelaySeconds,
     this.enabled = true,
     this.speakCurrentValue = false,
     this.notifyOnReturn = true,
     this.calculationWindowSeconds = 0,
     this.speakValueEvenWhenOk = false,
-  });
+  }) : outOfRangeDelaySeconds = outOfRangeDelaySeconds ??
+            (metric == AlertMetric.bpm ? 3 : 10);
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -370,20 +371,25 @@ class CoachingAlert {
     'speakValueEvenWhenOk': speakValueEvenWhenOk,
   };
 
-  factory CoachingAlert.fromJson(Map<String, dynamic> json) => CoachingAlert(
-    id: json['id'] as String,
-    name: json['name'] as String,
-    metric: AlertMetric.values[json['metric'] as int? ?? 0],
-    minValue: (json['minValue'] as num?)?.toDouble() ?? 0,
-    maxValue: (json['maxValue'] as num?)?.toDouble() ?? 200,
-    okIntervalSeconds: json['okIntervalSeconds'] as int? ?? 120,
-    outOfRangeDelaySeconds: json['outOfRangeDelaySeconds'] as int? ?? 10,
-    enabled: json['enabled'] as bool? ?? true,
-    speakCurrentValue: json['speakCurrentValue'] as bool? ?? false,
-    notifyOnReturn: json['notifyOnReturn'] as bool? ?? true,
-    calculationWindowSeconds: json['calculationWindowSeconds'] as int? ?? 0,
-    speakValueEvenWhenOk: json['speakValueEvenWhenOk'] as bool? ?? false,
-  );
+  factory CoachingAlert.fromJson(Map<String, dynamic> json) {
+    final m = AlertMetric.values[json['metric'] as int? ?? 0];
+    final defaultDelay = m == AlertMetric.bpm ? 3 : 10;
+    return CoachingAlert(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      metric: m,
+      minValue: (json['minValue'] as num?)?.toDouble() ?? 0,
+      maxValue: (json['maxValue'] as num?)?.toDouble() ?? 200,
+      okIntervalSeconds: json['okIntervalSeconds'] as int? ?? 120,
+      outOfRangeDelaySeconds:
+          json['outOfRangeDelaySeconds'] as int? ?? defaultDelay,
+      enabled: json['enabled'] as bool? ?? true,
+      speakCurrentValue: json['speakCurrentValue'] as bool? ?? false,
+      notifyOnReturn: json['notifyOnReturn'] as bool? ?? true,
+      calculationWindowSeconds: json['calculationWindowSeconds'] as int? ?? 0,
+      speakValueEvenWhenOk: json['speakValueEvenWhenOk'] as bool? ?? false,
+    );
+  }
 
   CoachingAlert copyWith({
     String? id,

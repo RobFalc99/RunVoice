@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/saved_ble_device.dart';
 import '../providers/preset_provider.dart';
 import '../providers/bluetooth_provider.dart';
 import '../providers/location_provider.dart';
@@ -170,6 +171,7 @@ class _TrainingScreenState extends State<TrainingScreen>
                         isConnected: bluetoothProvider.isConnected,
                         onTap: () => _showBluetoothDialog(bluetoothProvider),
                       ),
+                      _buildSavedDevicesSection(context, bluetoothProvider),
                     ],
                   ),
                 ),
@@ -678,6 +680,237 @@ class _TrainingScreenState extends State<TrainingScreen>
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) => const BluetoothDeviceDialog(),
+    );
+  }
+
+  Widget _buildSavedDevicesSection(
+    BuildContext context,
+    BluetoothProvider btProvider,
+  ) {
+    if (btProvider.isConnected || btProvider.savedDevices.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.history,
+                size: 16,
+                color: AppColors.textSecondary,
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'DISPOSITIVI MEMORIZZATI',
+                  style: TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ),
+              if (btProvider.isScanning)
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.primary,
+                  ),
+                )
+              else
+                InkWell(
+                  onTap: () => btProvider.startScan(),
+                  borderRadius: BorderRadius.circular(8),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    child: Text(
+                      'Cerca attivi',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ...btProvider.savedDevices.map((device) {
+            final isDiscovered = btProvider.isDeviceDiscovered(device.id);
+            final isConnectingThis = btProvider.isDeviceConnecting(device.id);
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: isDiscovered
+                    ? AppColors.primary.withValues(alpha: 0.08)
+                    : AppColors.surfaceHighlight.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isDiscovered
+                      ? AppColors.success.withValues(alpha: 0.4)
+                      : AppColors.neuBorder.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: isDiscovered
+                          ? AppColors.success.withValues(alpha: 0.15)
+                          : AppColors.surfaceHighlight,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.bluetooth,
+                      color: isDiscovered
+                          ? AppColors.success
+                          : AppColors.textSecondary,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                device.name,
+                                style: const TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (isDiscovered) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.success
+                                      .withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Text(
+                                  'Attivo',
+                                  style: TextStyle(
+                                    color: AppColors.success,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          device.id,
+                          style: const TextStyle(
+                            color: AppColors.textMuted,
+                            fontSize: 11,
+                            fontFeatures: [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (isConnectingThis)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 14),
+                      child: SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    )
+                  else
+                    ElevatedButton(
+                      onPressed: btProvider.isConnecting
+                          ? null
+                          : () async {
+                              final ok = await btProvider
+                                  .connectToSavedDevice(device);
+                              if (!ok && context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Impossibile connettersi a ${device.name}. Assicurati che sia attivo.',
+                                    ),
+                                    backgroundColor: AppColors.error,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isDiscovered
+                            ? AppColors.primary
+                            : AppColors.surfaceHighlight,
+                        foregroundColor: isDiscovered
+                            ? Colors.white
+                            : AppColors.textPrimary,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        minimumSize: Size.zero,
+                        elevation: 0,
+                      ),
+                      child: Text(
+                        isDiscovered ? 'Connetti' : 'Collega',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.close,
+                      size: 16,
+                      color: AppColors.textMuted,
+                    ),
+                    tooltip: 'Dimentica dispositivo',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 28,
+                      minHeight: 28,
+                    ),
+                    onPressed: () => btProvider.removeSavedDevice(device.id),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
     );
   }
 

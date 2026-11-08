@@ -39,6 +39,8 @@ class WorkoutService {
   final Map<String, int> _coachingOutDuration = {};
   final Map<String, int> _coachingOkDuration = {};
   final Map<String, bool> _coachingWasOut = {};
+  final Map<String, int> _lastEvaluatedSecondForAlert = {};
+  int _lastHrEvaluationSecond = -1;
   List<HeartRateZone> _hrZones = [];
   final List<WorkoutHistoryRecord> _history = [];
 
@@ -114,6 +116,8 @@ class WorkoutService {
     _coachingOutDuration.clear();
     _coachingOkDuration.clear();
     _coachingWasOut.clear();
+    _lastEvaluatedSecondForAlert.clear();
+    _lastHrEvaluationSecond = -1;
     _alertDistanceCheckpoints.clear();
     _history.clear();
 
@@ -122,6 +126,13 @@ class WorkoutService {
       _currentHeartRate = hr;
       if (_hrZones.isNotEmpty) {
         _currentZone = HRZoneCalculator.getCurrentZone(hr, _hrZones);
+      }
+      if (_state == WorkoutState.running) {
+        final sec = _elapsedTime.inSeconds;
+        if (sec != _lastHrEvaluationSecond) {
+          _lastHrEvaluationSecond = sec;
+          _evaluateHrCoachingAlerts();
+        }
       }
       onDataUpdated?.call();
     };
@@ -357,6 +368,117 @@ class WorkoutService {
     }
   }
 
+  void _processCoachingAlert(CoachingAlert alert) {
+    if (!alert.enabled) return;
+
+    final currentSec = _elapsedTime.inSeconds;
+    if (_lastEvaluatedSecondForAlert[alert.id] == currentSec) {
+      return;
+    }
+    _lastEvaluatedSecondForAlert[alert.id] = currentSec;
+
+    final value = _calculateWindowedValue(alert);
+
+    if (value == null) {
+      _coachingOutDuration[alert.id] = 0;
+      _coachingOkDuration[alert.id] = 0;
+      return;
+    }
+
+    final isInRange = value >= alert.minValue && value <= alert.maxValue;
+
+    if (isInRange) {
+      // In range
+      _coachingOkDuration[alert.id] =
+          (_coachingOkDuration[alert.id] ?? 0) + 1;
+
+      // Hysteresis for physiological metrics (BPM):
+      // If the value is on the exact boundary (e.g. 130 when max is 130),
+      // do not instantly wipe out-duration to 0 on a single boundary reading.
+      // Require confirmed in-range (2 consecutive in-range seconds or value clearly inside range).
+      final isBorder = (alert.metric == AlertMetric.bpm) &&
+          ((value - alert.minValue).abs() <= 1.0 ||
+              (value - alert.maxValue).abs() <= 1.0);
+
+      if (!isBorder || (_coachingOkDuration[alert.id] ?? 0) >= 2) {
+        _coachingOutDuration[alert.id] = 0;
+      } else if ((_coachingOutDuration[alert.id] ?? 0) > 0) {
+        _coachingOutDuration[alert.id] = _coachingOutDuration[alert.id]! - 1;
+      }
+
+      final wasOut = _coachingWasOut[alert.id] ?? false;
+      bool shouldNotify = false;
+
+      if (alert.notifyOnReturn && wasOut) {
+        if (_coachingOkDuration[alert.id]! >= alert.outOfRangeDelaySeconds) {
+          shouldNotify = true;
+        }
+      } else {
+        if (_coachingOkDuration[alert.id]! >= alert.okIntervalSeconds) {
+          shouldNotify = true;
+        }
+      }
+
+      if (shouldNotify) {
+        _ttsService.enqueue(
+          alert.buildMessage(value, speakUnits: _speakUnits),
+        );
+        _coachingOkDuration[alert.id] = 0;
+        _coachingWasOut[alert.id] = false;
+      }
+    } else {
+      // Out of range
+      _coachingWasOut[alert.id] = true;
+      _coachingOkDuration[alert.id] = 0;
+      _coachingOutDuration[alert.id] =
+          (_coachingOutDuration[alert.id] ?? 0) + 1;
+
+      if (_coachingOutDuration[alert.id]! >= alert.outOfRangeDelaySeconds) {
+        _ttsService.enqueue(
+          alert.buildMessage(value, speakUnits: _speakUnits),
+        );
+        _coachingOutDuration[alert.id] = 0;
+      }
+    }
+  }
+
+  void _evaluateHrCoachingAlerts() {
+    if (_activePreset == null || _state != WorkoutState.running) return;
+
+    final currentStep = (_activePreset!.isIntervalTraining &&
+            _currentIntervalIndex < _activePreset!.intervals.length)
+        ? _activePreset!.intervals[_currentIntervalIndex]
+        : null;
+
+    if (currentStep != null) {
+      final stepHrAlerts = currentStep.coachingAlerts
+          .where(
+            (a) =>
+                a.enabled &&
+                (a.metric == AlertMetric.bpm || a.metric == AlertMetric.hrZone),
+          )
+          .toList();
+      if (stepHrAlerts.isNotEmpty) {
+        for (final a in stepHrAlerts) {
+          _processCoachingAlert(a);
+        }
+        return;
+      }
+    }
+
+    for (final a in _activePreset!.coachingAlerts) {
+      if (a.enabled &&
+          (a.metric == AlertMetric.bpm || a.metric == AlertMetric.hrZone)) {
+        if (currentStep != null &&
+            currentStep.coachingAlerts
+                .any((ca) => ca.enabled && ca.metric == a.metric)) {
+          continue;
+        }
+        _processCoachingAlert(a);
+      }
+    }
+  }
+
   /// Evaluate coaching alerts every second
   void _evaluateCoachingAlerts() {
     if (_activePreset == null) return;
@@ -372,58 +494,12 @@ class WorkoutService {
       if (!alert.enabled) continue;
 
       if (currentStep != null &&
-          currentStep.coachingAlerts.any((ca) => ca.enabled && ca.metric == alert.metric)) {
+          currentStep.coachingAlerts
+              .any((ca) => ca.enabled && ca.metric == alert.metric)) {
         continue;
       }
 
-      final value = _calculateWindowedValue(alert);
-
-      if (value == null) {
-        _coachingOutDuration[alert.id] = 0;
-        _coachingOkDuration[alert.id] = 0;
-        continue;
-      }
-
-      if (value >= alert.minValue && value <= alert.maxValue) {
-        // In range
-        _coachingOutDuration[alert.id] = 0;
-        _coachingOkDuration[alert.id] =
-            (_coachingOkDuration[alert.id] ?? 0) + 1;
-
-        final wasOut = _coachingWasOut[alert.id] ?? false;
-        bool shouldNotify = false;
-
-        if (alert.notifyOnReturn && wasOut) {
-          if (_coachingOkDuration[alert.id]! >= alert.outOfRangeDelaySeconds) {
-            shouldNotify = true;
-          }
-        } else {
-          if (_coachingOkDuration[alert.id]! >= alert.okIntervalSeconds) {
-            shouldNotify = true;
-          }
-        }
-
-        if (shouldNotify) {
-          _ttsService.enqueue(
-            alert.buildMessage(value, speakUnits: _speakUnits),
-          );
-          _coachingOkDuration[alert.id] = 0;
-          _coachingWasOut[alert.id] = false;
-        }
-      } else {
-        // Out of range
-        _coachingWasOut[alert.id] = true;
-        _coachingOkDuration[alert.id] = 0;
-        _coachingOutDuration[alert.id] =
-            (_coachingOutDuration[alert.id] ?? 0) + 1;
-
-        if (_coachingOutDuration[alert.id]! >= alert.outOfRangeDelaySeconds) {
-          _ttsService.enqueue(
-            alert.buildMessage(value, speakUnits: _speakUnits),
-          );
-          _coachingOutDuration[alert.id] = 0;
-        }
-      }
+      _processCoachingAlert(alert);
     }
   }
 
@@ -597,6 +673,7 @@ class WorkoutService {
     _coachingOutDuration.clear();
     _coachingOkDuration.clear();
     _coachingWasOut.clear();
+    _lastEvaluatedSecondForAlert.clear();
   }
 
   void _checkStepDistanceAlerts() {
@@ -623,48 +700,7 @@ class WorkoutService {
 
     for (var alert in currentStep.coachingAlerts) {
       if (!alert.enabled) continue;
-
-      final value = _calculateWindowedValue(alert);
-
-      if (value == null) {
-        _coachingOutDuration[alert.id] = 0;
-        _coachingOkDuration[alert.id] = 0;
-        continue;
-      }
-
-      if (value >= alert.minValue && value <= alert.maxValue) {
-        // In range
-        _coachingOutDuration[alert.id] = 0;
-        _coachingOkDuration[alert.id] = (_coachingOkDuration[alert.id] ?? 0) + 1;
-
-        final wasOut = _coachingWasOut[alert.id] ?? false;
-        bool shouldNotify = false;
-
-        if (alert.notifyOnReturn && wasOut) {
-          if (_coachingOkDuration[alert.id]! >= alert.outOfRangeDelaySeconds) {
-            shouldNotify = true;
-          }
-        } else {
-          if (_coachingOkDuration[alert.id]! >= alert.okIntervalSeconds) {
-            shouldNotify = true;
-          }
-        }
-
-        if (shouldNotify) {
-          _ttsService.enqueue(alert.buildMessage(value, speakUnits: _speakUnits));
-          _coachingOkDuration[alert.id] = 0;
-          _coachingWasOut[alert.id] = false;
-        }
-      } else {
-        _coachingWasOut[alert.id] = true;
-        _coachingOkDuration[alert.id] = 0;
-        _coachingOutDuration[alert.id] = (_coachingOutDuration[alert.id] ?? 0) + 1;
-
-        if (_coachingOutDuration[alert.id]! >= alert.outOfRangeDelaySeconds) {
-          _ttsService.enqueue(alert.buildMessage(value, speakUnits: _speakUnits));
-          _coachingOutDuration[alert.id] = 0;
-        }
-      }
+      _processCoachingAlert(alert);
     }
   }
 

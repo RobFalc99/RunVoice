@@ -161,7 +161,7 @@ class WorkoutCoachingPlan {
       enabled: true,
       speakCurrentValue: true,
       okIntervalSeconds: 60,
-      outOfRangeDelaySeconds: 10,
+      outOfRangeDelaySeconds: alertMetric == AlertMetric.bpm ? 3 : 10,
       notifyOnReturn: true,
     );
   }
@@ -698,7 +698,7 @@ class WorkoutPlan {
               enabled: true,
               speakCurrentValue: true,
               okIntervalSeconds: 60,
-              outOfRangeDelaySeconds: 10,
+              outOfRangeDelaySeconds: 3,
               notifyOnReturn: true,
             ));
             if (step.duration.inSeconds >= 60 && !stepAlerts.any((a) => a.metric == AlertMetric.bpm && a.id == '${stepId}_periodic_bpm')) {

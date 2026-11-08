@@ -265,7 +265,7 @@ class _AlertSetupSheetState extends State<AlertSetupSheet> {
         break;
       case AlertMetric.bpm:
         _minValue = 120;
-        _maxValue = 160;
+        _maxValue = 130;
         break;
       case AlertMetric.speed:
         _minValue = 8.0;
@@ -276,7 +276,7 @@ class _AlertSetupSheetState extends State<AlertSetupSheet> {
         _maxValue = 200;
     }
     _okIntervalSeconds = 120;
-    _outOfRangeDelaySeconds = 10;
+    _outOfRangeDelaySeconds = m == AlertMetric.bpm ? 3 : 10;
     _speakCurrentValue = false;
     _notifyOnReturn = true;
     _calculationWindowSeconds = 0;
@@ -1001,6 +1001,75 @@ class _AlertSetupSheetState extends State<AlertSetupSheet> {
                 height: 1.3,
               ),
             ),
+          ),
+          const SizedBox(height: 14),
+        ],
+        if (_metric == AlertMetric.bpm) ...[
+          _sectionLabel('RANGE BATTITI TARGET (BPM)'),
+          Container(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceLight.withValues(alpha: 0.7),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: AppColors.neuBorder.withValues(alpha: 0.55),
+              ),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Min: ${_minValue.round()} BPM',
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      'Max: ${_maxValue.round()} BPM',
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+                RangeSlider(
+                  values: RangeValues(
+                    _minValue.clamp(40.0, 220.0),
+                    _maxValue.clamp(40.0, 220.0),
+                  ),
+                  min: 40,
+                  max: 220,
+                  divisions: 180,
+                  activeColor: _accent,
+                  inactiveColor: AppColors.surfaceHighlight,
+                  onChanged: (RangeValues v) {
+                    setState(() {
+                      _minValue = v.start.roundToDouble();
+                      _maxValue = v.end.roundToDouble();
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          _sectionLabel('RITARDO CONTROLLO FUORI RANGE'),
+          _buildStepSlider(
+            value: _outOfRangeDelaySeconds.toDouble(),
+            min: 1,
+            max: 30,
+            divisions: 29,
+            step: 1,
+            unit: 's',
+            onChanged: (v) =>
+                setState(() => _outOfRangeDelaySeconds = v.round()),
+            formatValue: (v) => '${v.round()} s',
           ),
           const SizedBox(height: 14),
         ],

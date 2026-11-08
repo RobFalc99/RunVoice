@@ -87,7 +87,7 @@ class PresetProvider extends ChangeNotifier {
           minValue: 2,
           maxValue: 2.9,
           okIntervalSeconds: 300,
-          outOfRangeDelaySeconds: 15,
+          outOfRangeDelaySeconds: 3,
           enabled: false,
         ),
       ],
